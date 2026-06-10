@@ -32,7 +32,7 @@ PLS regression with the Dayal & MacGregor (1997) improved kernel algorithm.
 - `standardize`: scale each column of X and Y to unit std if true.
 - `method`: `:algo1` (default, no XᵀX) or `:algo2` (forms XᵀX once).
 """
-function pls(X, Y; nlv = 2, standardize = false, method = :algo1)
+function plskern(X, Y; nlv = 2, standardize = false, method = :algo1)
     X = Matrix{Float64}(X)
     Y = Y isa AbstractVector ? reshape(Float64.(Y), :, 1) : Matrix{Float64}(Y)  # ensure Y is a matrix
     n, p = size(X)
@@ -106,7 +106,7 @@ function pls(X, Y; nlv = 2, standardize = false, method = :algo1)
 end
 
 # regression coefficients B (p × q) and intercept, in original units (eq. 38)
-function plscoef(m::Plsr; nlv = size(m.R, 2))
+function plskerncoef(m::Plsr; nlv = size(m.R, 2))
     nlv = min(nlv, size(m.R, 2))
     B = (m.R[:, 1:nlv] ./ m.xscales) * (m.Q[:, 1:nlv]') .* m.yscales'   # R Qᵀ, rescaled
     intercept = m.ymeans' .- m.xmeans' * B  # Y = Ymeans + (X - Xmeans) * B = (Ymeans - Xmeans * B) + Xmeans * B
@@ -114,14 +114,14 @@ function plscoef(m::Plsr; nlv = size(m.R, 2))
 end
 
 # predict Y for new X
-function plspredict(m::Plsr, Xnew; nlv = size(m.R, 2))
+function plskernpredict(m::Plsr, Xnew; nlv = size(m.R, 2))
     Xnew = Matrix{Float64}(Xnew)
-    B, intercept = plscoef(m; nlv = nlv)
+    B, intercept = plskerncoef(m; nlv = nlv)
     return intercept .+ Xnew * B    # Ŷ = intercept .+ Xnew * B
 end
 
 # project new X onto the latent variables (scores): T = Xc * R  (eq. 20)
-function plstransform(m::Plsr, Xnew; nlv = size(m.R, 2))
+function plskerntransform(m::Plsr, Xnew; nlv = size(m.R, 2))
     Xnew = Matrix{Float64}(Xnew)              # ensure concrete Float64 matrix
     nlv  = min(nlv, size(m.R, 2))             # don't ask for more components than exist
     Xc   = (Xnew .- m.xmeans') ./ m.xscales'  # center and scale using the STORED stats

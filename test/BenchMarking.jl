@@ -97,7 +97,7 @@ println("\n--- timing ---")
 
 
 
-# Benchmarking my PLS with Jchemo's plskern (both = Dayal & MacGregor algo #1)
+# Benchmarking my PLSkern with Jchemo's plskern (both = Dayal & MacGregor algo #1)
 # Comparing results AND speed, with OLS as the ground-truth anchor.
 Random.seed!(1234)
 n, p, nlv = 5000, 200, 15
@@ -107,11 +107,11 @@ y = randn(n)                      # single response (q = 1)
 # --- RESULTS: compare regression coefficients B (uniquely determined, no sign ambiguity) ---
 
 # mine (algo1)
-m_mine        = BigRiverSchneider.pls(X, y; nlv = nlv, method = :algo1)
-B_mine, _     = BigRiverSchneider.plscoef(m_mine)
+m_mine        = BigRiverSchneider.plskern(X, y; nlv = nlv, method = :algo1)
+B_mine, _     = BigRiverSchneider.plskerncoef(m_mine)
 
 # Jchemo (build-then-fit! workflow)
-mod_jc = plskern(; nlv = nlv)     # NOTE: scal defaults to false — matches our standardize=false
+mod_jc = Jchemo.plskern(; nlv = nlv)     # NOTE: scal defaults to false — matches our standardize=false
 fit!(mod_jc, X, y)
 B_jc   = coef(mod_jc).B
 
@@ -123,27 +123,27 @@ println("  max |B|  mine vs Jchemo   : ", round(maximum(abs.(B_mine .- B_jc)), d
 # max |B|  mine vs Jchemo   : 0.0
 
 # full-rank check: at nlv = p, BOTH must equal OLS
-m_full       = BigRiverSchneider.pls(X, y; nlv = p, method = :algo1)
-B_full, int_full = BigRiverSchneider.plscoef(m_full)
+m_full       = BigRiverSchneider.plskern(X, y; nlv = p, method = :algo1)
+B_full, int_full = BigRiverSchneider.plskerncoef(m_full)
 Xc    = X .- mean(X, dims = 1)
 B_ols = Xc \ (y .- mean(y))
-ŷ_mine = BigRiverSchneider.plspredict(m_full, X)
+ŷ_mine = BigRiverSchneider.plskernpredict(m_full, X)
 ŷ_ols  = mean(y) .+ Xc * B_ols
 println("  max |pred| full-PLS vs OLS: ", round(maximum(abs.(vec(ŷ_mine) .- ŷ_ols)), digits = 10))
 #  max |pred| full-PLS vs OLS: 0.0
 
-mod_jc_full = plskern(; nlv = p); fit!(mod_jc_full, X, y)
+mod_jc_full = Jchemo.plskern(; nlv = p); fit!(mod_jc_full, X, y)
 ŷ_jc_full   = predict(mod_jc_full, X).pred
 println("  max |pred| Jchemo vs OLS  : ", round(maximum(abs.(vec(ŷ_jc_full) .- ŷ_ols)), digits = 10))
 #  max |pred| Jchemo vs OLS  : 0.0
 
 # --- SPEED ---
 println("\n--- timing ---")
-print("mine (algo1) : "); @btime BigRiverSchneider.pls($X, $y; nlv = $nlv, method = :algo1);
+print("mine (algo1) : "); @btime BigRiverSchneider.plskern($X, $y; nlv = $nlv, method = :algo1);
 # mine (algo1) :   3.169 ms (756 allocations: 17.52 MiB)
-print("mine (algo2) : "); @btime BigRiverSchneider.pls($X, $y; nlv = $nlv, method = :algo2);
+print("mine (algo2) : "); @btime BigRiverSchneider.plskern($X, $y; nlv = $nlv, method = :algo2);
 # mine (algo2) :   3.938 ms (759 allocations: 17.84 MiB)
-print("Jchemo       : "); @btime (m = plskern(; nlv = $nlv); fit!(m, $X, $y));
+print("Jchemo       : "); @btime (m = Jchemo.plskern(; nlv = $nlv); fit!(m, $X, $y));
 # Jchemo       :   4.281 ms (1158 allocations: 8.69 MiB)
 
 
