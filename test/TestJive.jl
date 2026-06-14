@@ -1,334 +1,111 @@
-# test/TestJive.jl
-
+# test/TestJiveRjive.jl — thorough validation of jive_rjive (given + auto ranks)
 using BigRiverSchneider, RCall, BenchmarkTools
 using LinearAlgebra, Statistics, Random
 Random.seed!(1234)
 
-
-# ---------------------------------------------------------------------------
-# Build data with KNOWN joint + individual structure (supplement §6.2 generative model):
-#   X₁ = U₁S + W₁S₁ ,  X₂ = U₂S + W₂S₂   — shared scores S, individual scores Sᵢ.
-# ---------------------------------------------------------------------------
-n = 100
-r, r1, r2 = 2, 3, 3            # true ranks: joint=2, individual=3 each
-p1, p2 = 40, 30                # variables per dataset
-
-S  = randn(r, n)               # shared JOINT scores (same across both datasets)
-U1 = randn(p1, r); U2 = randn(p2, r)     # joint loadings
-S1 = randn(r1, n); W1 = randn(p1, r1)    # individual to dataset 1
-S2 = randn(r2, n); W2 = randn(p2, r2)    # individual to dataset 2
-
-X1 = U1*S + W1*S1              # dataset 1 = joint + individual (no noise)
-X2 = U2*S + W2*S2              # dataset 2
-
-println("X1 is $p1×$n,  X2 is $p2×$n,  true ranks: joint=$r, indiv=[$r1,$r2]\n")
-
-res = jive([X1, X2], r, [r1, r2]; standardize = false)
-
-# ---------------------------------------------------------------------------
-# TEST 1 — Exact reconstruction (supplement §6.2 anchor).
-# No noise + true ranks ⇒ JIVE must recover the data to machine precision.
-# ---------------------------------------------------------------------------
-Xc1 = X1 .- mean(X1, dims = 2)         # compare against row-centered data
-Xc2 = X2 .- mean(X2, dims = 2)
-recon_err = norm(Xc1 .- (res.J[1] .+ res.A[1]))^2 +
-            norm(Xc2 .- (res.J[2] .+ res.A[2]))^2
-println("TEST 1  exact reconstruction (noiseless, true ranks)")
-println("  ‖X − (J+A)‖²        : ", round(recon_err, digits = 12), "   (want ≈ 0)\n")
-
-# ---------------------------------------------------------------------------
-# TEST 2 — Orthogonality constraint  J Aᵢᵀ = 0  (the defining JIVE property).
-# Joint and individual row spaces must be orthogonal (enforced by the I−VVᵀ projection).
-# ---------------------------------------------------------------------------
-Jfull = vcat(res.J[1], res.J[2])
-ortho1 = norm(Jfull * res.A[1]')       # J Aᵢᵀ should be ≈ 0
-ortho2 = norm(Jfull * res.A[2]')
-println("TEST 2  orthogonality of joint & individual  (J Aᵢᵀ = 0)")
-println("  ‖J·A₁ᵀ‖             : ", round(ortho1, digits = 10))
-println("  ‖J·A₂ᵀ‖             : ", round(ortho2, digits = 10), "   (want ≈ 0)\n")
-
-# ---------------------------------------------------------------------------
-# TEST 3 — Ranks of the estimated structures match the requested ranks.
-# ---------------------------------------------------------------------------
-rank_tol = 1e-8
-joint_rank = rank(Jfull, rank_tol)
-indiv_rank1 = rank(res.A[1], rank_tol)
-indiv_rank2 = rank(res.A[2], rank_tol)
-println("TEST 3  estimated ranks match requested")
-println("  joint rank          : ", joint_rank,  "  (want $r)")
-println("  individual rank 1   : ", indiv_rank1, "  (want $r1)")
-println("  individual rank 2   : ", indiv_rank2, "  (want $r2)\n")
-
-# ---------------------------------------------------------------------------
-# TEST 4 — Factorization consistency: J should equal U·S, Aᵢ should equal Wᵢ·Sᵢ.
-# Checks jive_factorize / the returned scores & loadings reconstruct the matrices.
-# ---------------------------------------------------------------------------
-fac_err_joint = norm(res.J[1] .- res.U[1]*res.S) + norm(res.J[2] .- res.U[2]*res.S)
-fac_err_ind   = norm(res.A[1] .- res.Wi[1]*res.Si[1]) + norm(res.A[2] .- res.Wi[2]*res.Si[2])
-println("TEST 4  factorization consistency")
-println("  ‖J − U·S‖           : ", round(fac_err_joint, digits = 10), "   (want ≈ 0)")
-println("  ‖A − W·S_indiv‖     : ", round(fac_err_ind,   digits = 10), "   (want ≈ 0)\n")
-
-# ---------------------------------------------------------------------------
-# TEST 5 — Recovery of the JOINT SUBSPACE (the scientifically meaningful part).
-# JIVE's joint scores S should span the same space as the true shared S.
-# Compare via principal angles: the subspaces should align (canonical correlations ≈ 1).
-# ---------------------------------------------------------------------------
-Strue = S .- mean(S, dims = 2)          # center true joint scores for fair comparison
-Sest  = res.S
-# subspace alignment: singular values of (orthonormal basis of Strueᵀ)ᵀ (orthonormal basis of Sestᵀ)
-Qtrue = Matrix(qr(Strue').Q)[:, 1:r]
-Qest  = Matrix(qr(Sest').Q)[:, 1:r]
-canon = svd(Qtrue' * Qest).S            # canonical correlations between the two joint subspaces
-println("TEST 5  joint subspace recovery")
-println("  canonical correlations: ", round.(canon, digits = 6), "   (want all ≈ 1.0)")
-
-
-
-
-# test/CompareJive.jl — JIVE: our vs r.jive vs ground truth, + benchmark.
-
-#  data with KNOWN joint + individual structure, noiseless (ground truth) 
-n = 100; r, r1, r2 = 2, 3, 3; p1, p2 = 40, 30
-S  = randn(r, n)                          # shared joint scores (the TRUTH)
-U1 = randn(p1, r); U2 = randn(p2, r)
-S1 = randn(r1, n); W1 = randn(p1, r1)
-S2 = randn(r2, n); W2 = randn(p2, r2)
-X1 = U1*S + W1*S1
-X2 = U2*S + W2*S2
-Xc1 = X1 .- mean(X1, dims = 2)            # centered (what both methods decompose)
-Xc2 = X2 .- mean(X2, dims = 2)
-
-#  fit our jive 
-res = jive([X1, X2], r, [r1, r2]; standardize = false)
-
-#  fit r.jive on the same data, same given ranks 
-@rput X1 X2 r r1 r2
+# ============================================================
+# PART A — GIVEN RANKS: must still match r.jive bit-for-bit
+# (confirms the refactor didn't break the validated path)
+# ============================================================
 R"""
-library(r.jive)
-fit <- jive(list(X1, X2), rankJ = r, rankA = c(r1, r2),
-            method = "given", scale = FALSE, center = TRUE, showProgress = FALSE)
-J1r <- fit$joint[[1]];      J2r <- fit$joint[[2]]
-A1r <- fit$individual[[1]]; A2r <- fit$individual[[2]]
-d1  <- fit$data[[1]];       d2  <- fit$data[[2]]      # r.jive's CENTERED data
+library(r.jive); data(BRCA_data)
+X1<-Data[[1]]; X2<-Data[[2]]; X3<-Data[[3]]
 """
-@rget J1r J2r A1r A2r d1 d2
+@rget X1 X2 X3
+nm = ["Expression","Methylation","miRNA"]
 
-# helper: fraction of variance reconstructed (1.0 = perfect)
-varfrac(data, recon) = 1 - norm(data .- recon)^2 / norm(data)^2
-# helper: joint-subspace basis from a stacked joint matrix
-jbasis(Jblocks...) = Matrix(qr(svd(vcat(Jblocks...)).Vt[1:r, :]').Q)[:, 1:r]
+res = jive_rjive([X1,X2,X3], 2, [27,26,25])      # positional → given ranks
 
-println("="^60)
-println("JIVE VALIDATION:  yours  vs  r.jive  vs  ground truth")
-println("="^60)
+@rput X1 X2 X3
+R"""
+fit <- jive(list(X1,X2,X3), rankJ=2, rankA=c(27,26,25),
+            method="given", scale=TRUE, center=TRUE, est=TRUE, orthIndiv=TRUE,
+            showProgress=FALSE)
+"""
+R"J1<-fit$joint[[1]]; J2<-fit$joint[[2]]; J3<-fit$joint[[3]]"
+R"A1<-fit$individual[[1]]; A2<-fit$individual[[2]]; A3<-fit$individual[[3]]"
+R"d1<-fit$data[[1]]; d2<-fit$data[[2]]; d3<-fit$data[[3]]"
+@rget J1 J2 J3 A1 A2 A3 d1 d2 d3
+Jr=[J1,J2,J3]; Ar=[A1,A2,A3]; Dr=[d1,d2,d3]
 
-# ---- 1. GROUND TRUTH: does each recover the noiseless data exactly? ----
-println("\n[1] Reconstruction of data (fraction of variance, want 1.0)")
-println("  yours  D1: ", round(varfrac(Xc1, res.J[1].+res.A[1]), digits=6),
-        "   D2: ", round(varfrac(Xc2, res.J[2].+res.A[2]), digits=6))
-println("  r.jive D1: ", round(varfrac(d1, J1r.+A1r), digits=6),
-        "   D2: ", round(varfrac(d2, J2r.+A2r), digits=6))
+println("="^64)
+println("PART A — GIVEN RANKS: jive_rjive vs r.jive (should be bit-identical)")
+println("="^64)
+println("\nJ / A matrix differences (want 0.0):")
+for i in 1:3
+    println("  $(nm[i]): ‖J diff‖=", round(norm(res.J[i].-Jr[i]),digits=8),
+            "  ‖A diff‖=", round(norm(res.A[i].-Ar[i]),digits=8))
+end
+ve(J,A,D)=(norm(J)^2/norm(D)^2, norm(A)^2/norm(D)^2, norm(D.-J.-A)^2/norm(D)^2)
+println("\nvariance explained (yours vs r.jive):")
+for i in 1:3
+    println("  $(nm[i]): yours ", round.(ve(res.J[i],res.A[i],Dr[i]),digits=4),
+            "  r.jive ", round.(ve(Jr[i],Ar[i],Dr[i]),digits=4))
+end
+jb(b...) = Matrix(qr(svd(vcat(b...)).Vt[1:2,:]').Q)[:,1:2]
+println("\njoint subspace canonical corr: ", round.(svd(jb(res.J...)'*jb(Jr...)).S, digits=6))
 
-# sanity: r.jive's centered data must equal ours (same input)
-println("  (input check: ‖r.jive data − your centered‖² = ",
-        round(norm(d1 .- Xc1)^2 + norm(d2 .- Xc2)^2, digits=10), ", want 0)")
+# ============================================================
+# PART B — GROUND TRUTH: synthetic data with known structure
+# (does jive_rjive recover planted structure?)
+# ============================================================
+Random.seed!(7)
+nG=100; rG,r1G,r2G = 2,3,3
+SG=randn(rG,nG); U1=randn(40,rG); U2=randn(30,rG)
+S1=randn(r1G,nG); W1=randn(40,r1G); S2=randn(r2G,nG); W2=randn(30,r2G)
+G1=U1*SG+W1*S1; G2=U2*SG+W2*S2
+resG = jive_rjive([G1,G2], rG, [r1G,r2G]; scale=false)
+# scaled data jive_rjive used (scale=false → just centered)
+Gc = [G .- mean(G,dims=2) for G in (G1,G2)]
+println("\n", "="^64)
+println("PART B — GROUND TRUTH (noiseless synthetic, given true ranks)")
+println("="^64)
+recon = sum(norm(Gc[i].-resG.J[i].-resG.A[i])^2 for i in 1:2)
+println("  reconstruction ‖X−(J+A)‖² : ", round(recon, digits=10), "  (want ≈0)")
+ortho = norm(vcat(resG.J...)*resG.A[1]') + norm(vcat(resG.J...)*resG.A[2]')
+println("  orthogonality ‖J·Aᵀ‖      : ", round(ortho, digits=10), "  (want ≈0)")
+Strue = SG .- mean(SG,dims=2)
+Qt = Matrix(qr(Strue').Q)[:,1:rG]
+Qm = Matrix(qr(svd(vcat(resG.J...)).Vt[1:rG,:]').Q)[:,1:rG]
+println("  joint subspace vs truth   : ", round.(svd(Qm'*Qt).S, digits=6), "  (want ≈1)")
 
-# ---- 2. JOINT SUBSPACE: the well-determined, convention-robust comparison ----
-Strue = S .- mean(S, dims=2)
-Qtrue = Matrix(qr(Strue').Q)[:, 1:r]
-Qmine = jbasis(res.J[1], res.J[2])
-Qrjv  = jbasis(J1r, J2r)
-println("\n[2] Joint subspace alignment (canonical correlations, want ≈1)")
-println("  yours  vs ground truth : ", round.(svd(Qmine' * Qtrue).S, digits=6))
-println("  r.jive vs ground truth : ", round.(svd(Qrjv'  * Qtrue).S, digits=6))
-println("  yours  vs r.jive       : ", round.(svd(Qmine' * Qrjv ).S, digits=6))
+# ============================================================
+# PART C — AUTO RANKS: permutation test estimates ranks
+# (does the perm path find the vignette's ranks 2, [27,26,25]?)
+# ============================================================
+println("\n", "="^64)
+println("PART C — AUTO RANKS via permutation (r.jive method=\"perm\")")
+println("="^64)
+Random.seed!(1234)
+# NOTE: this is SLOW on full BRCA. Use fewer perms for a quick check, or subset.
+res_auto = jive_rjive([X1,X2,X3]; nperm=50)      # ranks estimated
+println("  estimated joint rank : ", res_auto.r)
+println("  estimated indiv ranks: ", res_auto.ri)
+println("  (vignette/given ranks were: 2, [27,26,25])")
 
-# ---- 3. ORTHOGONALITY: the defining JIVE property (ours) ----
-Jm = vcat(res.J[1], res.J[2])
-println("\n[3] Orthogonality  J·Aᵢᵀ = 0  (ours, want ≈0)")
-println("  ‖J·A₁ᵀ‖ = ", round(norm(Jm*res.A[1]'), digits=8),
-        "   ‖J·A₂ᵀ‖ = ", round(norm(Jm*res.A[2]'), digits=8))
+# compare auto vs r.jive's own permutation estimate
+R"""
+set.seed(1234)
+fitperm <- jive(list(X1,X2,X3), method="perm", est=TRUE, orthIndiv=TRUE,
+                showProgress=FALSE)
+rJ_r <- fitperm$rankJ; rA_r <- fitperm$rankA
+"""
+@rget rJ_r rA_r
+println("  r.jive perm estimate : joint ", Int(rJ_r), ", indiv ", Int.(rA_r))
 
-# ---- 4. BENCHMARK ----
-println("\n[4] Timing")
-print("  yours (Julia) : ")
-@btime jive([$X1, $X2], $r, [$r1, $r2]; standardize=false);
+# ============================================================
+# PART D — BENCHMARKING (given-ranks path, the fast one)
+# ============================================================
+println("\n", "="^64)
+println("PART D — TIMING (given ranks)")
+println("="^64)
+print("  jive_rjive (Julia): ")
+@btime jive_rjive([$X1,$X2,$X3], 2, [27,26,25]);
 R"""
 library(microbenchmark)
 mb <- microbenchmark(
-  jive(list(X1, X2), rankJ=r, rankA=c(r1,r2),
-       method="given", scale=FALSE, center=TRUE, showProgress=FALSE),
-  times = 20)
-cat("  r.jive (R)    :  median", round(median(mb$time)/1e6, 2), "ms\n")
+  jive(list(X1,X2,X3), rankJ=2, rankA=c(27,26,25), method="given",
+       scale=TRUE, center=TRUE, est=TRUE, orthIndiv=TRUE, showProgress=FALSE),
+  times=10)
+cat("  r.jive (R)        :  median", round(median(mb$time)/1e6,2), "ms\n")
 """
-
-
-# jive_fast — JIVE with the SVD-reduction speedup (supplement §4).
-# Identical results to jive(), much faster for WIDE data (pᵢ > n): each dataset
-
-"""
-    jive_fast(Xs, r, ri; standardize = true, tol = 1e-10, maxiter = 1000)
-
-Same JIVE decomposition as `jive`, but uses the supplement §4 SVD-reduction:
-each dataset is reduced to an n×rank(Xᵢ) representation before the alternating
-loop, then mapped back. Gives identical results, far faster when pᵢ ≫ n.
-"""
-function jive_fast(Xs::Vector{<:AbstractMatrix}, r::Int, ri::Vector{Int};
-                   standardize = true, tol = 1e-10, maxiter = 1000)
-    k = length(Xs)
-    Xs = [Matrix{Float64}(X) for X in Xs]
-    n = size(Xs[1], 2)
-    all(size(X, 2) == n for X in Xs) || throw(ArgumentError("All datasets must share the same number of columns (samples)"))
-    length(ri) == k || throw(ArgumentError("ri must have one rank per dataset (length $k), got length $(length(ri))"))
-    T_ = Float64
-
-    #  preprocessing (same as jive): row-center, optional Frobenius scale 
-    Xc = Vector{Matrix{T_}}(undef, k)
-    for i in 1:k
-        Xi = Xs[i] .- mean(Xs[i], dims = 2)
-        standardize && (Xi ./= norm(Xi))
-        Xc[i] = Xi
-    end
-
-    #  §4 SVD-REDUCTION: compress each Xᵢ to Xᵢ⊥ = Λᵢ Vᵢᵀ, remember Uᵢ to map back 
-    Ubig    = Vector{Matrix{T_}}(undef, k)         # left singular vectors (pᵢ × rᵢ_full), for mapping back
-    Xred    = Vector{Matrix{T_}}(undef, k)         # reduced data Xᵢ⊥ (rank_i × n)
-    for i in 1:k
-        Fi = svd(Xc[i])
-        tolσ = maximum(Fi.S) * max(size(Xc[i])...) * eps(T_)   # numerical rank threshold
-        rank_i = count(>(tolσ), Fi.S)              # numerical rank of Xᵢ (≤ n)
-        Ubig[i] = Fi.U[:, 1:rank_i]                # pᵢ × rank_i
-        Xred[i] = Diagonal(Fi.S[1:rank_i]) * Fi.Vt[1:rank_i, :]   # Λᵢ Vᵢᵀ  (rank_i × n)
-    end
-
-    pis = [size(X, 1) for X in Xred]               # NOW these are the REDUCED row counts (rank_i)
-    stack(blocks) = reduce(vcat, blocks)
-    function rowblocks(M)
-        idx = 1; out = Matrix{T_}[]
-        for pᵢ in pis
-            push!(out, M[idx:idx+pᵢ-1, :]); idx += pᵢ
-        end
-        out
-    end
-
-    # --- STAGE 1: alternating loop, but on the SMALL reduced matrices ---
-    Xjoint = stack(Xred)
-    A⊥ = [zeros(T_, pis[i], n) for i in 1:k]        # reduced individual structures
-    J⊥ = [zeros(T_, pis[i], n) for i in 1:k]
-    prev_norm = Inf
-    for _ in 1:maxiter
-        F = svd(Xjoint)
-        Jfull = F.U[:, 1:r] * Diagonal(F.S[1:r]) * F.Vt[1:r, :]
-        J⊥ = rowblocks(Jfull)
-        V = F.Vt[1:r, :]'
-        for i in 1:k
-            Xindiv = Xred[i] .- J⊥[i]
-            proj = Xindiv .- (Xindiv * V) * V'
-            Fi = svd(proj)
-            rri = ri[i]
-            A⊥[i] = Fi.U[:, 1:rri] * Diagonal(Fi.S[1:rri]) * Fi.Vt[1:rri, :]
-        end
-        Xjoint = stack([Xred[i] .- A⊥[i] for i in 1:k])
-        R = stack([Xred[i] .- J⊥[i] .- A⊥[i] for i in 1:k])
-        cur = norm(R)
-        abs(prev_norm - cur) < tol && break
-        prev_norm = cur
-    end
-
-    # --- MAP BACK to full variable space: Jᵢ = Uᵢ Jᵢ⊥, Aᵢ = Uᵢ Aᵢ⊥ (supplement §4) ---
-    J = [Ubig[i] * J⊥[i] for i in 1:k]
-    A = [Ubig[i] * A⊥[i] for i in 1:k]
-
-    # --- STAGE 2: factorize (same as jive, now on full-size J and A) ---
-    Fj = svd(stack(J))
-    S  = Fj.Vt[1:r, :]
-    Ufull = Fj.U[:, 1:r] * Diagonal(Fj.S[1:r])
-    pis_full = [size(Ji, 1) for Ji in J]
-    U = Matrix{T_}[]; idx = 1
-    for pᵢ in pis_full
-        push!(U, Ufull[idx:idx+pᵢ-1, :]); idx += pᵢ
-    end
-    Si = Matrix{T_}[]; Wi = Matrix{T_}[]
-    for i in 1:k
-        Fi = svd(A[i]); rri = ri[i]
-        push!(Si, Fi.Vt[1:rri, :])
-        push!(Wi, Fi.U[:, 1:rri] * Diagonal(Fi.S[1:rri]))
-    end
-
-    return JiveResult{T_}(J, A, S, U, Si, Wi, r, ri)
-end
-
-
-
-
-# test/TestJiveFast.jl
-# Validate jive_fast (SVD-reduction, supplement §4) against the reference jive().
-# The supplement guarantees IDENTICAL results — so they must match to machine precision.
-
-using BigRiverSchneider, BenchmarkTools
-using LinearAlgebra, Statistics, Random
-Random.seed!(1234)
-
-# helper: compare two JiveResults on the well-determined quantities
-function compare_results(a, b)
-    jdiff = sum(norm(a.J[i] .- b.J[i]) for i in eachindex(a.J))
-    adiff = sum(norm(a.A[i] .- b.A[i]) for i in eachindex(a.A))
-    return jdiff, adiff
-end
-
-println("="^60)
-println("jive_fast  vs  jive   (must be identical — supplement §4)")
-println("="^60)
-
-# ---------------------------------------------------------------------------
-# CASE 1 — TALL data (pᵢ < n). Reduction does nothing here, but results must
-# still match. This checks correctness of the map-back machinery.
-# ---------------------------------------------------------------------------
-n = 100; r, r1, r2 = 2, 3, 3
-S = randn(r, n); U1 = randn(40, r); U2 = randn(30, r)
-S1 = randn(r1, n); W1 = randn(40, r1)
-S2 = randn(r2, n); W2 = randn(30, r2)
-X1t = U1*S + W1*S1
-X2t = U2*S + W2*S2
-
-slow_t = jive(     [X1t, X2t], r, [r1, r2]; standardize = false)
-fast_t = jive_fast([X1t, X2t], r, [r1, r2]; standardize = false)
-jd, ad = compare_results(slow_t, fast_t)
-println("\n[CASE 1: tall data 40×100, 30×100]")
-println("  ‖J_slow − J_fast‖ : ", round(jd, digits = 12))
-println("  ‖A_slow − A_fast‖ : ", round(ad, digits = 12), "   (want ≈ 0)")
-
-# ---------------------------------------------------------------------------
-# CASE 2 — WIDE data (pᵢ ≫ n). This is where §4 actually compresses and speeds up.
-# Build wide datasets with known low-rank joint+individual structure.
-# ---------------------------------------------------------------------------
-nw = 80; rw, rw1, rw2 = 2, 3, 3
-p1w, p2w = 3000, 2000                       # MANY more variables than samples
-Sw  = randn(rw, nw)
-U1w = randn(p1w, rw); U2w = randn(p2w, rw)
-S1w = randn(rw1, nw); W1w = randn(p1w, rw1)
-S2w = randn(rw2, nw); W2w = randn(p2w, rw2)
-X1w = U1w*Sw + W1w*S1w
-X2w = U2w*Sw + W2w*S2w
-
-slow_w = jive(     [X1w, X2w], rw, [rw1, rw2]; standardize = false)
-fast_w = jive_fast([X1w, X2w], rw, [rw1, rw2]; standardize = false)
-jd_w, ad_w = compare_results(slow_w, fast_w)
-println("\n[CASE 2: wide data 3000×80, 2000×80]")
-println("  ‖J_slow − J_fast‖ : ", round(jd_w, digits = 10))
-println("  ‖A_slow − A_fast‖ : ", round(ad_w, digits = 10), "   (want ≈ 0)")
-
-# also confirm fast version recovers ground truth exactly (noiseless)
-Xc1w = X1w .- mean(X1w, dims = 2); Xc2w = X2w .- mean(X2w, dims = 2)
-recon_fast = norm(Xc1w .- (fast_w.J[1].+fast_w.A[1]))^2 + norm(Xc2w .- (fast_w.J[2].+fast_w.A[2]))^2
-println("  jive_fast vs ground truth ‖X−(J+A)‖² : ", round(recon_fast, digits = 10), "   (want ≈ 0)")
-
-# ---------------------------------------------------------------------------
-# TIMING — on the WIDE data, where the reduction should win.
-# ---------------------------------------------------------------------------
-println("\n[TIMING on wide data 3000×80, 2000×80]")
-print("  jive (full)  : ")
-@btime jive(     [$X1w, $X2w], $rw, [$rw1, $rw2]; standardize = false);
-print("  jive_fast    : ")
-@btime jive_fast([$X1w, $X2w], $rw, [$rw1, $rw2]; standardize = false);

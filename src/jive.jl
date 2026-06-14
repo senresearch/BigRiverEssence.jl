@@ -323,12 +323,13 @@ end
 
 
 
-
 # Abhisek Banerjee
 # jive_rjive — replicates r.jive's jive(method="given", scale=TRUE, est=TRUE, orthIndiv=TRUE).
 # Matches r.jive's source exactly: scaling = norm(Xi,'fro')*sqrt(sum of all element counts),
 # SVD-reduction before the loop with map-back, and individual⊥individual orthogonality.
 
+
+#=
 function jive_rjive(Xs::Vector{<:AbstractMatrix}, r::Int, ri::Vector{Int};
                     scale = true, center = true, tol = nothing, maxiter = 1000)
     k = length(Xs)
@@ -457,5 +458,218 @@ function jive_rjive(Xs::Vector{<:AbstractMatrix}, r::Int, ri::Vector{Int};
 
     return JiveResult{T_}(Jfull, Afull, S, U, Si, Wi, r, ri)
 end
+=#
 
 
+
+using LinearAlgebra, Statistics, Random
+
+# ============================================================================
+# INTERNAL CORE — your exact jive_rjive algorithm, taking PREPROCESSED data Xc
+# and ranks. This is byte-for-byte your validated computation (from SVD-reduction
+# onward). Not called directly by the user.
+# ============================================================================
+function _jive_rjive_core(Xc::Vector{Matrix{Float64}}, n::Int, r::Int, ri::Vector{Int};
+                          conv::Float64, maxiter::Int)
+    T_ = Float64
+    k = length(Xc)
+
+    # --- SVD-reduction (est=TRUE): reduce each block to ΛVᵀ, keep U to map back ---
+    Ubig = Vector{Matrix{T_}}(undef, k)
+    Xr   = Vector{Matrix{T_}}(undef, k)
+    for i in 1:k
+        if size(Xc[i],1) > size(Xc[i],2)
+            F = svd(Xc[i]); nc = size(Xc[i], 2)
+            Xr[i] = Diagonal(F.S[1:nc]) * F.Vt[1:nc, :]
+            Ubig[i] = F.U[:, 1:nc]
+        else
+            Xr[i] = Xc[i]
+            Ubig[i] = Matrix{T_}(I, size(Xc[i],1), size(Xc[i],1))
+        end
+    end
+
+    pis = [size(X,1) for X in Xr]
+    stack(b) = reduce(vcat, b)
+    function rowblocks(M)
+        idx=1; out=Matrix{T_}[]
+        for p in pis; push!(out, M[idx:idx+p-1, :]); idx+=p; end
+        out
+    end
+
+    # --- jive.iter on the reduced data ---
+    A = [zeros(T_, pis[i], n) for i in 1:k]
+    J = [zeros(T_, pis[i], n) for i in 1:k]
+    Vind = [zeros(T_, n, ri[i]) for i in 1:k]
+    Xtot = stack(Xr)
+    Jtot = fill(-1.0, size(Xtot)); Atot = fill(-1.0, size(Xtot))
+
+    nrun = 0; converged = false
+    while nrun < maxiter && !converged
+        Jlast = copy(Jtot); Alast = copy(Atot)
+
+        if r > 0
+            tmp = Xtot .- Atot
+            s = svd(tmp)
+            Jtot = s.U[:,1:r] * Diagonal(s.S[1:r]) * s.Vt[1:r,:]
+            V = s.Vt[1:r,:]'
+        else
+            Jtot = zeros(T_, size(Xtot)); V = zeros(T_, n, 0)
+        end
+        J = rowblocks(Jtot)
+
+        for i in 1:k
+            if ri[i] > 0
+                tmp = (Xr[i] .- J[i]) * (I - V*V')
+                if nrun > 0
+                    for j in 1:k
+                        j == i && continue
+                        tmp = tmp * (I - Vind[j]*Vind[j]')
+                    end
+                end
+                s = svd(tmp)
+                Vind[i] = s.Vt[1:ri[i], :]'
+                A[i] = s.U[:,1:ri[i]] * Diagonal(s.S[1:ri[i]]) * s.Vt[1:ri[i],:]
+            else
+                A[i] = zeros(T_, pis[i], n)
+            end
+        end
+
+        if nrun == 0
+            for i in 1:k, j in 1:k
+                j == i && continue
+                A[i] = A[i] * (I - Vind[j]*Vind[j]')
+            end
+            for i in 1:k
+                if ri[i] > 0
+                    s = svd(A[i]); Vind[i] = s.Vt[1:ri[i], :]'
+                end
+            end
+        end
+
+        Atot = stack(A)
+        if norm(Jtot .- Jlast) <= conv && norm(Atot .- Alast) <= conv
+            converged = true
+        end
+        nrun += 1
+    end
+
+    # --- map back & factorize ---
+    Jfull = [Ubig[i] * J[i] for i in 1:k]
+    Afull = [Ubig[i] * A[i] for i in 1:k]
+    Fj = svd(reduce(vcat, Jfull))
+    S = Fj.Vt[1:r, :]
+    pis_full = [size(Ji,1) for Ji in Jfull]
+    Ufull = Fj.U[:,1:r] * Diagonal(Fj.S[1:r])
+    U = Matrix{T_}[]; idx=1
+    for p in pis_full; push!(U, Ufull[idx:idx+p-1,:]); idx+=p; end
+    Si = Matrix{T_}[]; Wi = Matrix{T_}[]
+    for i in 1:k
+        Fi = svd(Afull[i])
+        push!(Si, Fi.Vt[1:ri[i], :])
+        push!(Wi, Fi.U[:,1:ri[i]] * Diagonal(Fi.S[1:ri[i]]))
+    end
+    return JiveResult{T_}(Jfull, Afull, S, U, Si, Wi, r, ri)
+end
+
+# ============================================================================
+# PERMUTATION RANK SELECTION (r.jive's jive.perm) — estimates (r, ri) from
+# preprocessed data when ranks aren't supplied.
+# ============================================================================
+function _jive_perm_ranks(Xc::Vector{Matrix{Float64}}, n::Int;
+                          nperm::Int, alpha::Float64, conv::Float64,
+                          maxiter::Int, maxrounds::Int = 10)
+    k = length(Xc)
+    Jperp = [zeros(size(Xc[i])) for i in 1:k]
+    Aperp = [zeros(size(Xc[i])) for i in 1:k]
+    last = fill(-2, k+1); current = fill(-1, k+1)
+    rJ = 0; rA = zeros(Int, k); nrun = 0
+
+    while last != current && nrun < maxrounds
+        last = copy(current)
+
+        # joint rank: individual removed, permute columns within each block
+        full = [Xc[i] .- Aperp[i] for i in 1:k]
+        actual = svdvals(reduce(vcat, full))
+        nsv = min(n, sum(size(X,1) for X in Xc))
+        perms = zeros(nperm, nsv)
+        for p in 1:nperm
+            permuted = [full[i][:, randperm(n)] for i in 1:k]
+            sv = svdvals(reduce(vcat, permuted))
+            perms[p, 1:min(length(sv),nsv)] = sv[1:min(length(sv),nsv)]
+        end
+        rJ = 0
+        for i in 1:nsv
+            actual[i] > quantile(perms[:,i], 1-alpha) ? (rJ += 1) : break
+        end
+        rJ = max(rJ, last[1])
+
+        # individual ranks: joint removed, permute within each row
+        for i in 1:k
+            ind = Xc[i] .- Jperp[i]
+            actual_i = svdvals(ind)
+            nsv_i = min(n, size(ind,1))
+            perms_i = zeros(nperm, nsv_i)
+            for p in 1:nperm
+                permuted = similar(ind)
+                for row in 1:size(ind,1)
+                    permuted[row, :] = ind[row, randperm(n)]
+                end
+                sv = svdvals(permuted)
+                perms_i[p, 1:min(length(sv),nsv_i)] = sv[1:min(length(sv),nsv_i)]
+            end
+            ra = 0
+            for j in 1:nsv_i
+                actual_i[j] > quantile(perms_i[:,j], 1-alpha) ? (ra += 1) : break
+            end
+            rA[i] = ra
+        end
+
+        current = vcat(rJ, rA)
+
+        # refit at new ranks (to update Jperp/Aperp) if ranks changed
+        if last != current && rJ > 0
+            fit = _jive_rjive_core(Xc, n, rJ, rA; conv=conv, maxiter=maxiter)
+            Jperp = fit.J; Aperp = fit.A
+        end
+        nrun += 1
+    end
+    return rJ, rA
+end
+
+# ============================================================================
+# PUBLIC jive_rjive
+#   - ranks GIVEN  → identical to your validated version (method="given")
+#   - ranks OMITTED → estimates them by permutation (r.jive's method="perm")
+# ============================================================================
+function jive_rjive(Xs::Vector{<:AbstractMatrix};
+                    r = nothing, ri = nothing,
+                    scale = true, center = true, tol = nothing,
+                    maxiter = 1000, nperm = 100, alpha = 0.05)
+    k = length(Xs)
+    Xs = [Matrix{Float64}(X) for X in Xs]
+    n = size(Xs[1], 2)
+    all(size(X,2) == n for X in Xs) || throw(ArgumentError("all datasets need the same number of columns"))
+
+    # preprocessing: center + r.jive scaling (norm * sqrt(sum_n)) — exactly as before
+    nel = [size(X,1)*size(X,2) for X in Xs]; sum_n = sum(nel)
+    Xc = Vector{Matrix{Float64}}(undef, k)
+    for i in 1:k
+        Xi = center ? Xs[i] .- mean(Xs[i], dims=2) : copy(Xs[i])
+        scale && (Xi ./= (norm(Xi) * sqrt(sum_n)))
+        Xc[i] = Xi
+    end
+    conv = tol === nothing ? 1e-6 * norm(reduce(vcat, Xc)) : tol
+
+    # estimate ranks if not supplied (r.jive's default behavior)
+    if r === nothing || ri === nothing
+        println("Estimating ranks via permutation test...")
+        r, ri = _jive_perm_ranks(Xc, n; nperm=nperm, alpha=alpha, conv=conv, maxiter=maxiter)
+        println("Estimated joint rank: $r, individual ranks: $ri")
+    end
+
+    return _jive_rjive_core(Xc, n, r, ri; conv=conv, maxiter=maxiter)
+end
+
+# positional form: jive_rjive(Xs, r, ri; ...) — identical behavior to your current function
+jive_rjive(Xs::Vector{<:AbstractMatrix}, r::Int, ri::Vector{Int}; kwargs...) =
+    jive_rjive(Xs; r=r, ri=ri, kwargs...)
