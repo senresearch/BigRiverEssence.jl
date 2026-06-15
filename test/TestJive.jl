@@ -26,9 +26,9 @@ println("Simulated: X1 $(size(X1)), X2 $(size(X2)); true ranks joint=$rT, indiv=
 @rput X1 X2
 
 # helper: variance explained
-ve(J,A,D) = (norm(J)^2/norm(D)^2, norm(A)^2/norm(D)^2, norm(D.-J.-A)^2/norm(D)^2)
+ve(J,A,D) = (norm(J)^2/norm(D)^2, norm(A)^2/norm(D)^2, norm(D.-J.-A)^2/norm(D)^2)  # returns a tuple of (joint VE, indiv VE, residual VE) for a given dataset, where J is the joint structure, A is the individual structure, and D is the original data; this allows us to compare the variance explained by the joint and individual components in both our implementation and r.jive's implementation against the original data
 # helper: joint subspace basis
-jb(b...) = Matrix(qr(svd(vcat(b...)).Vt[1:2,:]').Q)[:,1:2]
+jb(b...) = Matrix(qr(svd(vcat(b...)).Vt[1:2,:]').Q)[:,1:2]  # computes the joint subspace basis from the joint structures of both datasets; this allows us to compare the joint subspaces obtained from our implementation and r.jive's implementation by computing the canonical correlation between their joint subspace bases, which is a robust way to compare subspaces even if the ranks differ slightly due to estimation variability
 
 # ================================================================
 # PART A — GIVEN RANKS: similarity to r.jive
@@ -49,8 +49,8 @@ d1A<-fitA$data[[1]]; d2A<-fitA$data[[2]]
 JrA=[J1A,J2A]; ArA=[A1A,A2A]; DrA=[d1A,d2A]
 
 println("\ninput match (scaled data, want 0):")
-nelA=[p1*n, p2*n]; sumnA=sum(nelA)
-XcA = [ let Xi=X.-mean(X,dims=2); Xi./(norm(Xi)*sqrt(sumnA)); end for X in (X1,X2) ]
+nelA=[p1*n, p2*n]; sumnA=sum(nelA)  # r.jive's scaling factor is the Frobenius norm of the full stacked data, which is sqrt(sum of squares of all elements) = sqrt(sum of (pᵢ*n) for i=1 to k) = sqrt(sumnA)
+XcA = [ let Xi=X.-mean(X,dims=2); Xi./(norm(Xi)*sqrt(sumnA)); end for X in (X1,X2) ] # row-center + r.jive scaling of the original data, which is what r.jive uses as the input to its algorithm; we compare this to the scaled data that our algorithm uses internally to ensure that we are starting from the same point before the decomposition
 for i in 1:2
     println("  $(nm[i]): ", round(norm(XcA[i].-DrA[i]),digits=10))
 end

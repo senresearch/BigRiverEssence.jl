@@ -1,9 +1,8 @@
 # test/VignetteFigures.jl — faithful reproduction of all r.jive vignette figures.
-# Ranks are ESTIMATED via permutation (r.jive's method="perm"), not given.
 using BigRiverSchneider, RCall, Plots, StatsPlots, Clustering, Distances
 using LinearAlgebra, Statistics
 
-# ---- load real BRCA data + cluster labels ----
+# load real BRCA data + cluster labels
 R"""
 library(r.jive); data(BRCA_data)
 X1<-Data[[1]]; X2<-Data[[2]]; X3<-Data[[3]]; cl<-clusts
@@ -11,8 +10,8 @@ X1<-Data[[1]]; X2<-Data[[2]]; X3<-Data[[3]]; cl<-clusts
 @rget X1 X2 X3 cl
 nm = ["Expression","Methylation","miRNA"]
 
-# ---- fit jive_rjive with permutation rank selection (no ranks given) ----
-println("Fitting jive_rjive with permutation rank selection (slow on BRCA)...")
+#  fit jive_rjive with permutation rank selection (no ranks given) 
+println("Fitting jive_rjive with permutation rank selection")
 res = jive_rjive([X1,X2,X3])                 # ranks estimated
 rJ  = res.r                                  # estimated joint rank
 println("Estimated ranks: joint=$rJ, individual=$(res.ri)\n")
@@ -25,9 +24,8 @@ clusters = Int.(cl)
 pal = [:black, :green, :purple]
 colors = [pal[c] for c in clusters]
 
-# ============================================================
+
 # FIGURE 1 — showVarExplained: ‖J‖²/‖data‖² stacked, grayscale
-# ============================================================
 VarJ = [norm(res.J[i])^2/norm(Dat[i])^2 for i in 1:3]
 VarI = [norm(res.A[i])^2/norm(Dat[i])^2 for i in 1:3]
 VarR = 1 .- VarJ .- VarI
@@ -40,13 +38,11 @@ fig1 = groupedbar(nm, [VarR VarI VarJ];                 # residual, individual, 
     lw = 0.3, linecolor = :black, bar_width = 0.7, ylims = (0,1))
 savefig(fig1, "vig_VarExplained.png"); println("Fig 1 → vig_VarExplained.png")
 
-# ============================================================
+
 # FIGURE 2 — showHeatmaps: Data = Joint + Individual + Noise per source.
-# bluered (:bwr) colormap, mean±3sd clipping, hclust ordering.
-# ============================================================
 Jstack = vcat(res.J...)
-col_order = hclust(pairwise(Euclidean(), Jstack, dims=2), linkage=:complete).order
-row_orders = [hclust(pairwise(Euclidean(), res.J[i], dims=1), linkage=:complete).order for i in 1:3]
+col_order = hclust(pairwise(Euclidean(), Jstack, dims=2), linkage=:complete).order    # cluster samples by their joint structure to reveal patterns in the heatmaps; this is a common technique to visualize the joint structure in multi-source data, as it groups together samples that have similar joint patterns across the datasets, making it easier to see the shared structure in the heatmaps of the joint, individual, and residual components for each dataset.
+row_orders = [hclust(pairwise(Euclidean(), res.J[i], dims=1), linkage=:complete).order for i in 1:3]  # cluster features within each dataset by their joint structure to reveal patterns in the heatmaps; this is a common technique to visualize the joint structure in multi-source data, as it groups together features that have similar joint patterns across the samples, making it easier to see the shared structure in the heatmaps of the joint, individual, and residual components for each dataset. Note that we cluster rows (features) separately for each dataset since they are different features, but we use the same column order (samples) for all datasets since they are the same samples. This allows us to compare the joint structure across datasets while accounting for their different feature spaces.
 
 W = [0.22, 0.04, 0.22, 0.04, 0.22, 0.04, 0.22]          # widths sum to 1.0
 
