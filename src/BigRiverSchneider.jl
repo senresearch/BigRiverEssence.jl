@@ -4,7 +4,7 @@ module BigRiverSchneider
 using LinearAlgebra, Statistics, Random
 
 include("pca.jl")
-export pca, pcaStructure, pca_transform, pca_invtransform
+export pca, pcaStructure, pca_transform, pca_invtransform, pca_opt
 
 include("pmd.jl") 
 export  pmd, pmd_orth
@@ -18,5 +18,22 @@ export  JiveResult, jive, jive_fast, jive_rjive
 
 
 
+
+
+
+
+
+# Optimized functions
+include("pca_opt.jl")
+export pca_opt
+
+include("pmd_opt.jl")
+export pmd_opt, pmd_orth_opt
+
+include("plskern_opt.jl")
+export plskern_opt
+
+include("jive_opt.jl")
+export _jive_rjive_core_opt, _jive_rjive_core_opt2
 
 end 

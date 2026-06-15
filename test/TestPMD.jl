@@ -64,3 +64,103 @@ println("  pmd_orth : ", round(offdiag_corr(T_orth), digits = 4))
 # the real check: recover the u's and confirm they're mutually orthogonal.
 # (pmd_orth doesn't store U, so recompute scores T = Xc*V and orthogonality
 #  shows up as near-zero off-diagonal dot products among the u directions)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# optimization test — full output comparison
+using BigRiverSchneider, BenchmarkTools, Random, LinearAlgebra, Statistics
+X = randn(500, 300)
+
+# helper: compare two pcaStructures field by field
+function compare_pmd(a, b; label="")
+    println("--- $label ---")
+    println("  mean      ‖diff‖     : ", norm(a.mean .- b.mean))
+    println("  scale     ‖diff‖     : ", norm(a.scale .- b.scale))
+    println("  loadings  ‖diff‖(abs): ", norm(abs.(a.loadings) .- abs.(b.loadings)))   # sign arbitrary
+    println("  variances ‖diff‖     : ", norm(a.variances .- b.variances))
+    println("  propOFvar ‖diff‖     : ", norm(a.propOFvar .- b.propOFvar))
+    println("  loadings size match  : ", size(a.loadings) == size(b.loadings))
+    # sparsity pattern: the SET of selected (nonzero) variables per component must match
+    sel(M) = [Set(findall(!iszero, M[:, j])) for j in 1:size(M,2)]
+    println("  sparsity pattern match: ", sel(a.loadings) == sel(b.loadings))
+end
+
+# seed identically before each call (random init in spca_component)
+Random.seed!(1234); ref      = pmd(X; k=5)
+Random.seed!(1234); opt      = pmd_opt(X; k=5)
+Random.seed!(1234); ref_orth = pmd_orth(X; k=5)
+Random.seed!(1234); opt_orth = pmd_orth_opt(X; k=5)
+
+compare_pmd(ref, opt; label="pmd: orig vs opt")
+compare_pmd(ref_orth, opt_orth; label="pmd_orth: orig vs opt")
+
+# ---- also verify the transform/reconstruction round-trips match ----
+println("\n--- transform & reconstruction ---")
+sc_ref = pca_transform(ref, X)
+sc_opt = pca_transform(opt, X)
+println("  pmd scores ‖diff‖(abs)        : ", norm(abs.(sc_ref) .- abs.(sc_opt)))
+rc_ref = pca_invtransform(ref, sc_ref)
+rc_opt = pca_invtransform(opt, sc_opt)
+println("  pmd reconstruction ‖diff‖     : ", norm(rc_ref .- rc_opt))
+
+sc_ref_o = pca_transform(ref_orth, X)
+sc_opt_o = pca_transform(opt_orth, X)
+println("  pmd_orth scores ‖diff‖(abs)   : ", norm(abs.(sc_ref_o) .- abs.(sc_opt_o)))
+rc_ref_o = pca_invtransform(ref_orth, sc_ref_o)
+rc_opt_o = pca_invtransform(opt_orth, sc_opt_o)
+println("  pmd_orth reconstruction ‖diff‖: ", norm(rc_ref_o .- rc_opt_o))
+
+# ---- benchmark ----
+println("\n=== pmd ===")
+print("orig: "); @btime pmd($X; k=5);
+print("opt : "); @btime pmd_opt($X; k=5);
+println("=== pmd_orth ===")
+print("orig: "); @btime pmd_orth($X; k=5);
+print("opt : "); @btime pmd_orth_opt($X; k=5);
+#=
+--- pmd: orig vs opt ---
+  mean      ‖diff‖     : 0.0
+  scale     ‖diff‖     : 0.0
+  loadings  ‖diff‖(abs): 3.035806350154647e-15
+  variances ‖diff‖     : 3.845925372767128e-15
+  propOFvar ‖diff‖     : 1.309687503460227e-17
+  loadings size match  : true
+  sparsity pattern match: true
+--- pmd_orth: orig vs opt ---
+  mean      ‖diff‖     : 0.0
+  scale     ‖diff‖     : 0.0
+  loadings  ‖diff‖(abs): 1.0674422605731333e-15
+  variances ‖diff‖     : 3.1714313080323688e-15
+  propOFvar ‖diff‖     : 1.0551910960100405e-17
+  loadings size match  : true
+  sparsity pattern match: true
+
+--- transform & reconstruction ---
+  pmd scores ‖diff‖(abs)        : 1.010448390320123e-13
+  pmd reconstruction ‖diff‖     : 1.3245071170843573e-13
+  pmd_orth scores ‖diff‖(abs)   : 3.835939221360121e-14
+  pmd_orth reconstruction ‖diff‖: 5.322783051703354e-14
+
+=== pmd ===
+orig:   238.930 ms (926827 allocations: 783.45 MiB)
+opt :   191.536 ms (139 allocations: 2.44 MiB)
+=== pmd_orth ===
+orig:   306.623 ms (1120253 allocations: 938.18 MiB)
+opt :   166.059 ms (147 allocations: 1.30 MiB)
+=#
