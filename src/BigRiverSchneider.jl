@@ -39,4 +39,7 @@ export plskern_opt
 include("jive_opt.jl")
 export jive_rjive_opt
 
+include("splsda_opt.jl")
+export splsda_opt
+
 end 
