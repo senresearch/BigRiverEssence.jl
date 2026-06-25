@@ -1,9 +1,11 @@
 # Test/cca_test.jl — formal tests for cca (canonical correlation analysis),
 # cca_transform, and the internal solvers (_cca_svd_opt, _cca_cov_opt, _qnormalize!).
+# Tolerances (tol_ord / tol_julia / tol_r) are defined in runtests.jl.
 #
-# Reference is MultivariateStats.CCA (pure Julia — no fixtures, no R). CCA solutions
-# are bit-identical up to per-column sign, so projections are compared sign-invariantly
-# (column-wise |·|) and correlations directly (sign-free by construction).
+# Reference is MultivariateStats.CCA (pure Julia — no fixtures, no R). CCA is a
+# deterministic eigenproblem, so it agrees bit-identically up to per-column sign:
+# the MVS cross-check uses tol_ord, projections compared sign-invariantly (column-wise
+# |·|) and correlations directly (sign-free by construction).
 
 const BRS = BigRiverSchneider
 const cca           = BRS.cca
@@ -12,10 +14,6 @@ const ccaStructure  = BRS.ccaStructure
 const _svdcca = BRS._cca_svd_opt
 const _covcca = BRS._cca_cov_opt
 const _qnorm  = BRS._qnormalize!
-
-
-
-
 
 # column-wise abs difference (per-column SVD/eigen sign is arbitrary)
 projdiff(A, B) = maximum(norm(abs.(@view A[:, j]) .- abs.(@view B[:, j])) for j in 1:size(A, 2))
@@ -35,7 +33,7 @@ projdiff(A, B) = maximum(norm(abs.(@view A[:, j]) .- abs.(@view B[:, j])) for j 
     @test M.xmean ≈ vec(mean(X, dims = 2))
     @test M.ymean ≈ vec(mean(Y, dims = 2))
     # canonical correlations are in [0,1] and descending
-    @test all(0 .<= M.corrs .<= 1 + 1e-9)
+    @test all(0 .<= M.corrs .<= 1 + tol_ord)
     @test issorted(M.corrs; rev = true)
 end
 
@@ -55,12 +53,12 @@ end
     X = randn(dx, 1) * z .+ 0.05 .* randn(dx, n)
     Y = randn(dy, 1) * z .+ 0.05 .* randn(dy, n)
     M = cca(X, Y; method = :svd)
-    @test M.corrs[1] > 0.99                       # leading correlation ≈ 1
+    @test M.corrs[1] > 0.99                       # leading correlation ≈ 1 (recovery floor)
     @test M.corrs[2] < 0.5                        # remaining clearly smaller
     # the leading canonical variates achieve that correlation
     Zx = cca_transform(M, X, :x)
     Zy = cca_transform(M, Y, :y)
-    @test isapprox(abs(cor(Zx[1, :], Zy[1, :])), M.corrs[1]; atol = 1e-6)
+    @test isapprox(abs(cor(Zx[1, :], Zy[1, :])), M.corrs[1]; atol = tol_ord)
 end
 
 @testset "cca_transform: canonical variates have the right correlations" begin
@@ -74,7 +72,7 @@ end
     @test size(Zx) == (length(M.corrs), n)
     # each pair of canonical variates correlates at the reported canonical corr
     for j in 1:length(M.corrs)
-        @test isapprox(abs(cor(Zx[j, :], Zy[j, :])), M.corrs[j]; atol = 1e-6)
+        @test isapprox(abs(cor(Zx[j, :], Zy[j, :])), M.corrs[j]; atol = tol_ord)
     end
     @test_throws ArgumentError cca_transform(M, X, :z)   # invalid component
 end
@@ -86,7 +84,7 @@ end
     sh = randn(2, n); X[1:2, :] .+= sh; Y[1:2, :] .+= sh
     Ms = cca(X, Y; method = :svd)
     Mc = cca(X, Y; method = :cov)
-    @test norm(sort(Ms.corrs) .- sort(Mc.corrs)) < 1e-10
+    @test norm(sort(Ms.corrs) .- sort(Mc.corrs)) < tol_ord
 end
 
 @testset "argument validation" begin
@@ -110,7 +108,7 @@ end
     _qnorm(P, C)
     # each column satisfies pⱼᵀ C pⱼ = 1
     for j in 1:p
-        @test isapprox(dot(@view(P[:, j]), C * @view(P[:, j])), 1.0; atol = 1e-10)
+        @test isapprox(dot(@view(P[:, j]), C * @view(P[:, j])), 1.0; atol = tol_ord)
     end
 end
 
@@ -123,7 +121,7 @@ end
     M = _svdcca(copy(X) .- xm, copy(Y) .- ym, xm, ym, min(dx, dy))
     @test M isa ccaStructure
     @test issorted(M.corrs; rev = true)
-    @test all(0 .<= M.corrs .<= 1 + 1e-9)
+    @test all(0 .<= M.corrs .<= 1 + tol_ord)
     @test M.nobs == n                               # svd path records nobs
 end
 
@@ -141,11 +139,11 @@ end
         Cxy = (Zx * Zy') ./ (n - 1)
         M = _covcca(Cxx, Cyy, Cxy, xm, ym, k)
         @test length(M.corrs) == k
-        @test all(0 .<= M.corrs .<= 1 + 1e-9)
+        @test all(0 .<= M.corrs .<= 1 + tol_ord)
         @test issorted(M.corrs; rev = true)
         # projections are C-normalized: PₓᵀCxxPₓ has unit diagonal
         D = M.xproj' * Cxx * M.xproj
-        @test all(isapprox.(diag(D), 1.0; atol = 1e-8))
+        @test all(isapprox.(diag(D), 1.0; atol = tol_ord))
     end
 end
 
@@ -166,11 +164,11 @@ end
 
         for meth in (:svd, :cov)
             M = cca(X, Y; method = meth)
-            # correlations match to machine precision (sign-free)
-            @test norm(sort(M.corrs) .- sort(rc)) < 1e-10
+            # correlations match to machine precision (sign-free, pure-Julia eigenproblem)
+            @test norm(sort(M.corrs) .- sort(rc)) < tol_ord
             # projections match up to per-column sign
-            @test projdiff(M.xproj, rPx) < 1e-9
-            @test projdiff(M.yproj, rPy) < 1e-9
+            @test projdiff(M.xproj, rPx) < tol_ord
+            @test projdiff(M.yproj, rPy) < tol_ord
         end
     end
 end

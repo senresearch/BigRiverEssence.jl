@@ -1,7 +1,6 @@
 # Test/splsda_test.jl — formal tests for splsda (sparse PLS-DA) and its
 # supporting functions: _center_scale, _unmap, _soft_threshold_L1!, _sqdiff.
-#
-
+# Tolerances (tol_ord / tol_julia / tol_r) are defined in runtests.jl.
 
 const BRS = BigRiverSchneider
 const splsda          = BRS.splsda
@@ -30,7 +29,7 @@ const _sqd   = BRS._sqdiff
     # each X-loading column keeps exactly keepX nonzeros, is unit-norm
     for c in 1:ncomp
         @test count(!iszero, m.loadings_X[:, c]) == 10
-        @test isapprox(norm(m.loadings_X[:, c]), 1.0; atol = 1e-8)
+        @test isapprox(norm(m.loadings_X[:, c]), 1.0; atol = tol_ord)
     end
 end
 
@@ -68,13 +67,13 @@ end
     m = splsda(X, y, 2, [10, 10])
 
     sel = findall(!iszero, m.loadings_X[:, 1])
-    @test length(intersect(sel, 1:10)) >= 8       # recovers the true signal vars
+    @test length(intersect(sel, 1:10)) >= 8       # recovery floor: recovers signal vars
     # component-1 scores separate the classes (between/within ≫ 1)
     sc = m.variates_X[:, 1]; grand = mean(sc)
     between = sum(n_per * (mean(sc[findall(==(c), y)]) - grand)^2 for c in classes)
     within  = sum(sum((sc[i] - mean(sc[findall(==(y[i]), y)]))^2
                       for i in findall(==(c), y)) for c in classes)
-    @test between / within > 10
+    @test between / within > 10                   # separation floor
 end
 
 @testset "levels controls class ordering" begin
@@ -104,11 +103,11 @@ end
     Random.seed!(5)
     M = randn(40, 8) .* (1:8)' .+ (1:8)'
     Cs = _cs(M; scale = true)
-    @test all(abs.(vec(mean(Cs, dims = 1))) .< 1e-10)            # columns centered
-    @test all(isapprox.(vec(std(Cs, dims = 1; corrected = true)), 1.0; atol = 1e-8))
+    @test all(abs.(vec(mean(Cs, dims = 1))) .< tol_ord)         # columns centered
+    @test all(isapprox.(vec(std(Cs, dims = 1; corrected = true)), 1.0; atol = tol_ord))
     Cc = _cs(M; scale = false)
-    @test all(abs.(vec(mean(Cc, dims = 1))) .< 1e-10)           # centered, not scaled
-    @test !all(isapprox.(vec(std(Cc, dims = 1)), 1.0; atol = 1e-6))
+    @test all(abs.(vec(mean(Cc, dims = 1))) .< tol_ord)         # centered, not scaled
+    @test !all(isapprox.(vec(std(Cc, dims = 1)), 1.0; atol = tol_ord))
     # constant column ⇒ zero std guarded (no NaN/Inf), set to 0
     Mz = hcat(randn(20), fill(3.0, 20))
     Csz = _cs(Mz; scale = true)
@@ -184,10 +183,10 @@ end
 
         for c in 1:ncomp
             # sign-invariant: correlation magnitude ≈ 1 (per-component SVD sign differs)
-            @test abs(cor(m.loadings_X[:, c], lx[:, c])) > 0.999
-            @test abs(cor(m.variates_X[:, c], vx[:, c])) > 0.999
-            @test abs(cor(m.loadings_Y[:, c], ly[:, c])) > 0.999
-            @test abs(cor(m.variates_Y[:, c], vy[:, c])) > 0.999
+            @test abs(cor(m.loadings_X[:, c], lx[:, c])) > 1 - tol_r
+            @test abs(cor(m.variates_X[:, c], vx[:, c])) > 1 - tol_r
+            @test abs(cor(m.loadings_Y[:, c], ly[:, c])) > 1 - tol_r
+            @test abs(cor(m.variates_Y[:, c], vy[:, c])) > 1 - tol_r
             # the SET of selected variables matches exactly
             @test Set(findall(!iszero, m.loadings_X[:, c])) == Set(findall(!iszero, lx[:, c]))
         end

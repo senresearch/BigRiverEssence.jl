@@ -1,6 +1,7 @@
 # Test/pca_test.jl — formal tests for pca (svd & cov).
+# Tolerances (tol_ord / tol_julia / tol_r) are defined in runtests.jl.
+# PCA is deterministic and has no external reference ⇒ everything uses tol_ord.
 
-# 
 loaddiff(A, B) = maximum(norm(abs.(A[:, j]) .- abs.(B[:, j])) for j in 1:size(A, 2))
 
 @testset "output structure & invariants" begin
@@ -18,19 +19,19 @@ loaddiff(A, B) = maximum(norm(abs.(A[:, j]) .- abs.(B[:, j])) for j in 1:size(A,
 
     # loadings are unit-norm columns
     for j in 1:k
-        @test isapprox(norm(m.loadings[:, j]), 1.0; atol=1e-8)
+        @test isapprox(norm(m.loadings[:, j]), 1.0; atol=tol_ord)
     end
     # variances non-negative and sorted descending (top-k, largest first)
-    @test all(m.variances .>= -1e-10)
+    @test all(m.variances .>= -tol_ord)
     @test issorted(m.variances; rev=true)
     # proportions in [0,1]
-    @test all(0 .<= m.propOFvar .<= 1 + 1e-10)
+    @test all(0 .<= m.propOFvar .<= 1 + tol_ord)
 
     # mean recovers the column means; no standardize → scale all ones
-    @test isapprox(m.mean, vec(mean(X, dims=1)); atol=1e-10)
+    @test isapprox(m.mean, vec(mean(X, dims=1)); atol=tol_ord)
     @test all(m.scale .== 1.0)
     ms = pca(X; k=k, standardize=true)
-    @test isapprox(ms.scale, vec(std(X, dims=1)); atol=1e-10)
+    @test isapprox(ms.scale, vec(std(X, dims=1)); atol=tol_ord)
 end
 
 @testset "loadings are orthonormal" begin
@@ -40,7 +41,7 @@ end
     X = randn(n, p)
     for method in (:svd, :cov)
         m = pca(X; k=k, method=method)
-        @test isapprox(m.loadings' * m.loadings, I(k); atol=1e-7)
+        @test isapprox(m.loadings' * m.loadings, I(k); atol=tol_ord)
     end
 end
 
@@ -54,8 +55,8 @@ end
 
     for method in (:svd, :cov)
         m = pca(X; k=2, method=method)
-        @test abs(dot(m.loadings[:, 1], w)) > 0.999     # PC1 aligns with w
-        @test m.propOFvar[1] > 0.99                     # PC1 dominates variance
+        @test abs(dot(m.loadings[:, 1], w)) > 1 - tol_r   # PC1 aligns with w (noisy ground truth)
+        @test m.propOFvar[1] > 1 - tol_r                  # PC1 dominates variance
     end
 end
 
@@ -69,7 +70,7 @@ end
     truevars = (svdvals(Xc) .^ 2) ./ (n - 1)
     for method in (:svd, :cov)
         m = pca(X; k=k, method=method)
-        @test isapprox(m.variances, truevars[1:k]; rtol=1e-7)
+        @test isapprox(m.variances, truevars[1:k]; rtol=tol_ord)
     end
 end
 
@@ -80,9 +81,9 @@ end
     X = randn(n, p)
     msvd = pca(X; k=k, method=:svd)
     mcov = pca(X; k=k, method=:cov)
-    @test isapprox(msvd.variances, mcov.variances; rtol=1e-8)
-    @test isapprox(msvd.propOFvar, mcov.propOFvar; rtol=1e-8)
-    @test loaddiff(msvd.loadings, mcov.loadings) < 1e-7
+    @test isapprox(msvd.variances, mcov.variances; rtol=tol_ord)
+    @test isapprox(msvd.propOFvar, mcov.propOFvar; rtol=tol_ord)
+    @test loaddiff(msvd.loadings, mcov.loadings) < tol_ord
 end
 
 @testset "proportions sum correctly" begin
@@ -91,7 +92,7 @@ end
     n, p = 200, 10
     X = randn(n, p)
     m = pca(X; k=p, method=:svd)
-    @test isapprox(sum(m.propOFvar), 1.0; atol=1e-8)
+    @test isapprox(sum(m.propOFvar), 1.0; atol=tol_ord)
 end
 
 @testset "sign consistency" begin
@@ -111,15 +112,15 @@ end
     Random.seed!(9)
     n, p = 150, 12
     X = randn(n, p)
-    m = pca(X; k=p)                               
+    m = pca(X; k=p)
     scores = pca_transform(m, X)
     @test size(scores) == (n, p)
     # all-component reconstruction returns X
     Xrec = pca_invtransform(m, scores)
-    @test isapprox(Xrec, X; atol=1e-8)
+    @test isapprox(Xrec, X; atol=tol_ord)
     # scores = centered data projected onto loadings
     Xc = X .- mean(X, dims=1)
-    @test isapprox(scores, Xc * m.loadings; atol=1e-8)
+    @test isapprox(scores, Xc * m.loadings; atol=tol_ord)
 end
 
 @testset "standardize round-trip" begin
@@ -128,7 +129,7 @@ end
     m = pca(X; k=10, standardize=true)
     scores = pca_transform(m, X)
     Xrec   = pca_invtransform(m, scores)
-    @test isapprox(Xrec, X; atol=1e-7)
+    @test isapprox(Xrec, X; atol=tol_ord)
 end
 
 @testset "determinism" begin
@@ -144,10 +145,7 @@ end
 @testset "argument validation" begin
     Random.seed!(0)
     X = randn(50, 8)
-    # k below range
-    @test_throws ArgumentError pca(X; k=0)          
-    # k > min(n,p)=8    
-    @test_throws ArgumentError pca(X; k=9)
-    # unknown method             
-    @test_throws ErrorException pca(X; method=:IWontMention)  
+    @test_throws ArgumentError pca(X; k=0)
+    @test_throws ArgumentError pca(X; k=9)                    # k > min(n,p)=8
+    @test_throws ErrorException pca(X; method=:IWontMention)  # unknown method
 end

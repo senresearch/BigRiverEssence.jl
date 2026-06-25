@@ -1,4 +1,5 @@
 # Test/spc_test.jl — formal tests for SPC (Witten sparse PCA): spc + spc_orth.
+# Tolerances (tol_ord / tol_julia / tol_r) are defined in runtests.jl.
 
 @testset "output structure & invariants" begin
     Random.seed!(1)
@@ -16,16 +17,16 @@
     # each loading column unit-norm (or zero)
     for j in 1:k
         nv = norm(m.loadings[:, j])
-        @test isapprox(nv, 1.0; atol=1e-6) || nv == 0.0
+        @test isapprox(nv, 1.0; atol=tol_ord) || nv == 0.0
     end
     @test all(isfinite, m.variances)
     @test all(isfinite, m.propOFvar)
     # cumulative PVE is nondecreasing and within [0, 1]
-    @test all(0 .<= m.propOFvar .<= 1 + 1e-9)
-    @test all(diff(m.propOFvar) .>= -1e-9)
+    @test all(0 .<= m.propOFvar .<= 1 + tol_ord)
+    @test all(diff(m.propOFvar) .>= -tol_ord)
     # column means recorded (default standardize=false ⇒ unit scale)
-    @test isapprox(m.mean, vec(mean(X, dims=1)); atol=1e-10)
-    @test all(isapprox.(m.scale, 1.0; atol=1e-12))
+    @test isapprox(m.mean, vec(mean(X, dims=1)); atol=tol_ord)
+    @test all(isapprox.(m.scale, 1.0; atol=tol_ord))
 end
 
 @testset "max budget reduces to ordinary PCA (theorem anchor)" begin
@@ -37,7 +38,7 @@ end
     Xc = X .- mean(X, dims=1)
     m = spc(X; k=1, c=sqrt(p))
     F = svd(Xc)
-    @test abs(dot(m.loadings[:, 1], F.V[:, 1])) > 0.999
+    @test abs(dot(m.loadings[:, 1], F.V[:, 1])) > 1 - tol_julia   # iterative
     @test count(!iszero, m.loadings[:, 1]) == p          # fully dense
 end
 
@@ -57,7 +58,7 @@ end
 @testset "ground-truth: recovers planted sparse loading" begin
     # plant a sparse rank-1 signal; a tight budget gives high PRECISION (every
     # selected variable is real) — recall is budget-limited, so we assert on
-    # precision + direction, not recall.
+    # precision + direction, not recall. Floors are literal recovery bars.
     Random.seed!(42)
     n, p = 200, 300
     u_true = [randn(50); zeros(n-50)]
@@ -89,7 +90,7 @@ end
     Co = cor(Xc * mo.loadings)
     Cd = cor(Xc * md.loadings)
     # orthogonal variant has lower off-diagonal score correlation than deflation
-    @test offdiag(Co) <= offdiag(Cd) + 1e-9
+    @test offdiag(Co) <= offdiag(Cd) + tol_ord
 end
 
 @testset "multiple components, shapes" begin
@@ -109,9 +110,9 @@ end
     n, p = 60, 40
     X = randn(n, p) .* (1:p)'            # wildly unequal column scales
     m = spc(X; k=1, c=0.5*sqrt(p), standardize=true)
-    @test isapprox(m.scale, vec(std(X, dims=1)); atol=1e-8)
+    @test isapprox(m.scale, vec(std(X, dims=1)); atol=tol_ord)
     md = spc(X; k=1, c=0.5*sqrt(p), standardize=false)
-    @test all(isapprox.(md.scale, 1.0; atol=1e-12))
+    @test all(isapprox.(md.scale, 1.0; atol=tol_ord))
 end
 
 @testset "determinism (SVD init, no random dependence)" begin
@@ -122,8 +123,8 @@ end
     b = spc(X; k=2, c=0.5*sqrt(p))
     for j in 1:2
         @test abs(dot(a.loadings[:,j] ./ norm(a.loadings[:,j]),
-                      b.loadings[:,j] ./ norm(b.loadings[:,j]))) > 0.999
-        @test isapprox(a.variances[j], b.variances[j]; rtol=1e-6)
+                      b.loadings[:,j] ./ norm(b.loadings[:,j]))) > 1 - tol_ord
+        @test isapprox(a.variances[j], b.variances[j]; rtol=tol_ord)
     end
 end
 
@@ -156,13 +157,13 @@ end
     # (1) slack budget: at c = √p no unit vector can exceed it ⇒ returned unchanged
     fv(v, s, z, sqrt(p))
     @test v ≈ z ./ norm(z)
-    @test isapprox(norm(v), 1.0; atol = 1e-10)
+    @test isapprox(norm(v), 1.0; atol = tol_ord)
 
     # (2) binding budget: result is unit-norm, L1 ≈ c
     for c in (2.0, 4.0, 6.0)
         fv(v, s, z, c)
-        @test isapprox(norm(v), 1.0; atol = 1e-6)            # unit L2
-        @test isapprox(sum(abs, v), c; atol = 1e-2)          # L1 hits the budget
+        @test isapprox(norm(v), 1.0; atol = tol_ord)         # unit L2
+        @test isapprox(sum(abs, v), c; atol = tol_r)         # L1 hits the budget (search precision)
         for i in eachindex(v)                                # signs inherited from z
             v[i] != 0 && @test sign(v[i]) == sign(z[i])
         end
@@ -188,7 +189,7 @@ end
         (lo + hi) / 2
     end
     ref = sign.(z) .* max.(abs.(z) .- δ, 0.0); ref ./= norm(ref)
-    @test abs(dot(v, ref)) > 0.999
+    @test abs(dot(v, ref)) > 1 - tol_julia          # same budget-solve, two routes
 end
 
 @testset "internal: init_rsv (top-k right singular vectors, both branches)" begin
@@ -200,8 +201,8 @@ end
     @test size(Vt) == (40, k)
     Ft = svd(Xt)
     for j in 1:k
-        @test isapprox(norm(@view Vt[:, j]), 1.0; atol = 1e-8)       # unit columns
-        @test abs(dot(Vt[:, j], Ft.V[:, j])) > 0.999                # = right sing. vec
+        @test isapprox(norm(@view Vt[:, j]), 1.0; atol = tol_ord)    # unit columns
+        @test abs(dot(Vt[:, j], Ft.V[:, j])) > 1 - tol_ord          # = right sing. vec
     end
     # wide (p > n): eigen(XXᵀ) + back-projection branch
     Xw = randn(30, 50)
@@ -209,8 +210,8 @@ end
     @test size(Vw) == (50, k)
     Fw = svd(Xw)
     for j in 1:k
-        @test isapprox(norm(@view Vw[:, j]), 1.0; atol = 1e-8)
-        @test abs(dot(Vw[:, j], Fw.V[:, j])) > 0.999
+        @test isapprox(norm(@view Vw[:, j]), 1.0; atol = tol_ord)
+        @test abs(dot(Vw[:, j], Fw.V[:, j])) > 1 - tol_ord
     end
 end
 
@@ -229,8 +230,8 @@ end
                sum(abs2, Xc * Vk * inv(Vk' * Vk) * Vk') / totsq
            end for k in 1:K]
     @test got ≈ ref                                # the rewrite is algebraically exact
-    @test all(0 .<= got .<= 1 + 1e-9)              # valid proportions
-    @test all(diff(got) .>= -1e-9)                 # cumulative ⇒ nondecreasing
+    @test all(0 .<= got .<= 1 + tol_ord)           # valid proportions
+    @test all(diff(got) .>= -tol_ord)              # cumulative ⇒ nondecreasing
 
     # independent anchor: for ORTHONORMAL V (svd), pve[k] = Σσ₁..ₖ² / Σσ²
     Vo = svd(Xc).V[:, 1:K]
@@ -252,11 +253,11 @@ end
     # at c = √p no penalty binds ⇒ pure power iteration ⇒ rank-1 SVD of Xc
     d = sc(v, Xc, sqrt(p), u, Xv, Xtu, s, vold; niter = 100)
     F = svd(Xc)
-    @test isapprox(norm(u), 1.0; atol = 1e-6)
-    @test isapprox(norm(v), 1.0; atol = 1e-6)
-    @test abs(dot(v, F.V[:, 1])) > 0.999          # v → V₁
-    @test abs(dot(u, F.U[:, 1])) > 0.999          # u → U₁
-    @test isapprox(d, F.S[1]; rtol = 1e-5)        # d → σ₁
+    @test isapprox(norm(u), 1.0; atol = tol_julia)
+    @test isapprox(norm(v), 1.0; atol = tol_julia)
+    @test abs(dot(v, F.V[:, 1])) > 1 - tol_julia      # v → V₁ (iterative)
+    @test abs(dot(u, F.U[:, 1])) > 1 - tol_julia      # u → U₁
+    @test isapprox(d, F.S[1]; rtol = tol_julia)       # d → σ₁
     @test d > 0
 
     # binding budget ⇒ v genuinely sparse
@@ -283,13 +284,13 @@ end
     sco(v1, Xc, sqrt(p), @view(U[:, 1:0]), u, uold, Xv, Xtu, s, vold, proj; niter = 100)
     U[:, 1] .= u
     F = svd(Xc)
-    @test abs(dot(U[:, 1], F.U[:, 1])) > 0.999     # u₁ → U₁ at max budget
+    @test abs(dot(U[:, 1], F.U[:, 1])) > 1 - tol_julia    # u₁ → U₁ at max budget (iterative)
 
     # component 2: U_prev = u₁ ⇒ returned u₂ must be orthogonal to u₁
     v2 = Vinit[:, 2]
     sco(v2, Xc, sqrt(p), @view(U[:, 1:1]), u, uold, Xv, Xtu, s, vold, proj; niter = 100)
-    @test isapprox(norm(u), 1.0; atol = 1e-6)
-    @test abs(dot(u, U[:, 1])) < 1e-8              # the defining orthogonality property
+    @test isapprox(norm(u), 1.0; atol = tol_julia)
+    @test abs(dot(u, U[:, 1])) < tol_ord              # the defining orthogonality property
 end
 
 @testset "matches R PMA::SPC (offline reference fixtures)" begin
@@ -319,16 +320,16 @@ end
         do_jl = sqrt.(max.(mo.variances, 0) .* (n - 1))
 
         for k in 1:K
-            # orth=FALSE
+            # orth=FALSE (cross-language ⇒ tol_r bar)
             @test abs(dot(m.loadings[:,k] ./ norm(m.loadings[:,k]),
-                          v_r[:,k] ./ norm(v_r[:,k]))) > 0.999
+                          v_r[:,k] ./ norm(v_r[:,k]))) > 1 - tol_r
             @test Set(findall(!iszero, m.loadings[:,k])) == Set(findall(!iszero, v_r[:,k]))
             # orth=TRUE
             @test abs(dot(mo.loadings[:,k] ./ norm(mo.loadings[:,k]),
-                          vo_r[:,k] ./ norm(vo_r[:,k]))) > 0.999
+                          vo_r[:,k] ./ norm(vo_r[:,k]))) > 1 - tol_r
             @test Set(findall(!iszero, mo.loadings[:,k])) == Set(findall(!iszero, vo_r[:,k]))
         end
-        @test isapprox(d_jl,  d_r;  rtol=1e-5)
-        @test isapprox(do_jl, do_r; rtol=1e-5)
+        @test isapprox(d_jl,  d_r;  rtol=tol_r)
+        @test isapprox(do_jl, do_r; rtol=tol_r)
     end
 end

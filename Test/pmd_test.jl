@@ -1,5 +1,5 @@
 # Test/pmd_test.jl — formal tests for the two-sided PMD(L1,L1).
-
+# Tolerances (tol_ord / tol_julia / tol_r) are defined in runtests.jl.
 
 @testset "output structure & invariants" begin
     Random.seed!(1)
@@ -16,16 +16,16 @@
     # both factors unit-norm (or zero) per component
     for k in 1:K
         nu = norm(m.u[:, k]); nv = norm(m.v[:, k])
-        @test isapprox(nu, 1.0; atol=1e-6) || nu == 0.0
-        @test isapprox(nv, 1.0; atol=1e-6) || nv == 0.0
+        @test isapprox(nu, 1.0; atol=tol_ord) || nu == 0.0
+        @test isapprox(nv, 1.0; atol=tol_ord) || nv == 0.0
     end
     # d values are real and finite
     @test all(isfinite, m.d)
     # budgets were resolved into the recorded range
-    @test 1 <= m.sumabsu <= sqrt(n) + 1e-9
-    @test 1 <= m.sumabsv <= sqrt(p) + 1e-9
+    @test 1 <= m.sumabsu <= sqrt(n) + tol_ord
+    @test 1 <= m.sumabsv <= sqrt(p) + tol_ord
     # grand mean recorded when centering
-    @test isapprox(m.meanx, mean(X); atol=1e-10)
+    @test isapprox(m.meanx, mean(X); atol=tol_ord)
 end
 
 @testset "max budget reduces to rank-1 SVD (theorem anchor)" begin
@@ -37,8 +37,8 @@ end
     Xc = X .- mean(X)
     m = pmd(X; sumabsu=sqrt(n), sumabsv=sqrt(p), K=1)
     F = svd(Xc)
-    @test abs(dot(m.u[:, 1], F.U[:, 1])) > 0.999     # u → U₁
-    @test abs(dot(m.v[:, 1], F.V[:, 1])) > 0.999     # v → V₁
+    @test abs(dot(m.u[:, 1], F.U[:, 1])) > 1 - tol_julia   # u → U₁ (iterative)
+    @test abs(dot(m.v[:, 1], F.V[:, 1])) > 1 - tol_julia   # v → V₁
     # and both factors are fully dense at max budget
     @test count(!iszero, m.u[:, 1]) == n
     @test count(!iszero, m.v[:, 1]) == p
@@ -71,9 +71,9 @@ end
     m = pmd(X; sumabsu=0.45*sqrt(n), sumabsv=0.45*sqrt(p), K=2, center=true)
 
     for (k, (ut, vt)) in enumerate(((u1,v1),(u2,v2)))
+        # recovery floors on noisy planted data — deliberately literal (looser than 1-tol_r)
         @test abs(dot(m.u[:,k] ./ norm(m.u[:,k]), ut ./ norm(ut))) > 0.9
         @test abs(dot(m.v[:,k] ./ norm(m.v[:,k]), vt ./ norm(vt))) > 0.9
-        # recovered support overlaps the true support
         selu = Set(findall(!iszero, m.u[:,k])); trueu = Set(findall(!iszero, ut))
         selv = Set(findall(!iszero, m.v[:,k])); truev = Set(findall(!iszero, vt))
         @test length(intersect(selu, trueu)) / length(trueu) > 0.8
@@ -102,8 +102,8 @@ end
     # explicit budgets are recorded directly (ignoring sumabs)
     su = 0.3*sqrt(n); sv = 0.6*sqrt(p)
     m = pmd(X; sumabs=0.9, sumabsu=su, sumabsv=sv, K=1)
-    @test isapprox(m.sumabsu, su; atol=1e-10)
-    @test isapprox(m.sumabsv, sv; atol=1e-10)
+    @test isapprox(m.sumabsu, su; atol=tol_ord)
+    @test isapprox(m.sumabsv, sv; atol=tol_ord)
 end
 
 @testset "center=false skips centering" begin
@@ -123,8 +123,8 @@ end
     a = pmd(X; sumabs=0.4, K=2)
     b = pmd(X; sumabs=0.4, K=2)
     for k in 1:2
-        @test abs(dot(a.v[:,k] ./ norm(a.v[:,k]), b.v[:,k] ./ norm(b.v[:,k]))) > 0.999
-        @test isapprox(a.d[k], b.d[k]; rtol=1e-6)
+        @test abs(dot(a.v[:,k] ./ norm(a.v[:,k]), b.v[:,k] ./ norm(b.v[:,k]))) > 1 - tol_ord
+        @test isapprox(a.d[k], b.d[k]; rtol=tol_ord)
     end
 end
 
@@ -176,7 +176,7 @@ end
     a = randn(80); λ = 0.5
     @test l1ns(a, λ) ≈ l1n(soft.(a, λ))
     # bounded below by 1 for any nonzero vector (Cauchy–Schwarz)
-    @test l1n(randn(30)) >= 1 - 1e-9
+    @test l1n(randn(30)) >= 1 - tol_ord
 end
 
 @testset "internal: _pmd_l1diff (L1 distance)" begin
@@ -203,7 +203,7 @@ end
     λ = bs(z, 3.0)
     @test λ > 0
     @test λ <= maximum(abs, z)             # never exceeds the largest coefficient
-    @test isapprox(l1ns(z, λ), 3.0; atol = 1e-2)   # hits the requested budget
+    @test isapprox(l1ns(z, λ), 3.0; atol = tol_r)   # hits the requested budget (search precision)
     # monotone: a tighter budget needs a larger threshold
     @test bs(z, 2.0) >= bs(z, 4.0)
 end
@@ -214,7 +214,7 @@ end
     arg = [3.0, -4.0, 0.5]; out = similar(arg)
     sn(out, arg, 1.0)                      # soft = [2,-3,0] ; normalize by √13
     @test out ≈ [2.0, -3.0, 0.0] ./ sqrt(13)
-    @test norm(out) ≈ 1.0                  # unit L2 norm when entries survive
+    @test isapprox(norm(out), 1.0; atol=tol_ord)  # unit L2 norm when entries survive
     @test sign.(out) == sign.([2.0, -3.0, 0.0])   # signs preserved
     # matches the explicit construction on a random vector
     a = randn(50); o = similar(a); λ = 0.6
@@ -235,8 +235,8 @@ end
     @test size(Vt) == (40, K)
     Ft = svd(Xt)
     for k in 1:K
-        @test isapprox(norm(@view Vt[:, k]), 1.0; atol = 1e-8)        # unit columns
-        @test abs(dot(Vt[:, k], Ft.V[:, k])) > 0.999                 # = right sing. vec (up to sign)
+        @test isapprox(norm(@view Vt[:, k]), 1.0; atol = tol_ord)     # unit columns
+        @test abs(dot(Vt[:, k], Ft.V[:, k])) > 1 - tol_ord           # = right sing. vec (up to sign)
     end
     # wide matrix (p > n): uses svd(xxᵀ) branch + back-projection
     Xw = randn(30, 50)
@@ -244,8 +244,8 @@ end
     @test size(Vw) == (50, K)
     Fw = svd(Xw)
     for k in 1:K
-        @test isapprox(norm(@view Vw[:, k]), 1.0; atol = 1e-8)
-        @test abs(dot(Vw[:, k], Fw.V[:, k])) > 0.999
+        @test isapprox(norm(@view Vw[:, k]), 1.0; atol = tol_ord)
+        @test abs(dot(Vw[:, k], Fw.V[:, k])) > 1 - tol_ord
     end
 end
 
@@ -262,11 +262,11 @@ end
     # at max budget (√n, √p) no penalty binds ⇒ pure power iteration ⇒ rank-1 SVD
     d = smd(Xc, v0, sqrt(n), sqrt(p), 50, u, v, vold, argu, argv)
     F = svd(Xc)
-    @test isapprox(norm(u), 1.0; atol = 1e-6)
-    @test isapprox(norm(v), 1.0; atol = 1e-6)
-    @test abs(dot(u, F.U[:, 1])) > 0.999          # u → U₁
-    @test abs(dot(v, F.V[:, 1])) > 0.999          # v → V₁
-    @test isapprox(d, F.S[1]; rtol = 1e-5)        # d → σ₁
+    @test isapprox(norm(u), 1.0; atol = tol_julia)
+    @test isapprox(norm(v), 1.0; atol = tol_julia)
+    @test abs(dot(u, F.U[:, 1])) > 1 - tol_julia      # u → U₁ (iterative)
+    @test abs(dot(v, F.V[:, 1])) > 1 - tol_julia      # v → V₁
+    @test isapprox(d, F.S[1]; rtol = tol_julia)       # d → σ₁
     @test d > 0
     # a binding budget makes v genuinely sparse
     u2 = similar(u); v2 = similar(v); vo2 = similar(vold)
@@ -275,7 +275,6 @@ end
     @test count(!iszero, v2) < p
     @test count(!iszero, u2) < n
 end
-
 
 @testset "matches R PMA::PMD (offline reference fixtures)" begin
     # Reads precomputed R outputs from Test/Data/PMD/ (generated by pmd.R).
@@ -302,14 +301,14 @@ end
         m = pmd(X; sumabsu=su, sumabsv=sv, K=K, center=false)
 
         for k in 1:K
-            # both factors align up to sign (bit-identical → ≈ 1.0)
-            @test abs(dot(m.u[:,k] ./ norm(m.u[:,k]), u_r[:,k] ./ norm(u_r[:,k]))) > 0.999
-            @test abs(dot(m.v[:,k] ./ norm(m.v[:,k]), v_r[:,k] ./ norm(v_r[:,k]))) > 0.999
+            # both factors align up to sign (cross-language ⇒ tol_r bar)
+            @test abs(dot(m.u[:,k] ./ norm(m.u[:,k]), u_r[:,k] ./ norm(u_r[:,k]))) > 1 - tol_r
+            @test abs(dot(m.v[:,k] ./ norm(m.v[:,k]), v_r[:,k] ./ norm(v_r[:,k]))) > 1 - tol_r
             # selected supports match exactly (same features zeroed on both sides)
             @test Set(findall(!iszero, m.u[:,k])) == Set(findall(!iszero, u_r[:,k]))
             @test Set(findall(!iszero, m.v[:,k])) == Set(findall(!iszero, v_r[:,k]))
         end
-        # singular values match to machine precision
-        @test isapprox(m.d, d_r; rtol=1e-6)
+        # singular values match (cross-language)
+        @test isapprox(m.d, d_r; rtol=tol_r)
     end
 end

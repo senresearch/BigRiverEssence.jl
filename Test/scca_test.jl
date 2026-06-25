@@ -1,5 +1,6 @@
 # Test/scca_test.jl — formal tests for scca (sparse CCA, Witten PMA::CCA method)
-# and its supporting functions. 
+# and its supporting functions.
+# Tolerances (tol_ord / tol_julia / tol_r) are defined in runtests.jl.
 
 const BRS = BigRiverSchneider
 const scca          = BRS.scca
@@ -28,9 +29,9 @@ const _msqrt  = BRS._matsqrt
     # each canonical vector is unit-norm (or zero), correlations in [0,1]
     for k in 1:K
         nu = norm(m.u[:, k]); nv = norm(m.v[:, k])
-        @test isapprox(nu, 1.0; atol = 1e-6) || nu == 0.0
-        @test isapprox(nv, 1.0; atol = 1e-6) || nv == 0.0
-        @test 0 <= m.cors[k] <= 1 + 1e-9
+        @test isapprox(nu, 1.0; atol = tol_ord) || nu == 0.0
+        @test isapprox(nv, 1.0; atol = tol_ord) || nv == 0.0
+        @test 0 <= m.cors[k] <= 1 + tol_ord
     end
     @test all(isfinite, m.d)
 end
@@ -56,7 +57,7 @@ end
              penaltyx = 0.2, penaltyz = 0.2, K = 1)
     sel_x = Set(findall(!iszero, m.u[:, 1]))
     sel_z = Set(findall(!iszero, m.v[:, 1]))
-    # high precision: selected features are predominantly the true ones
+    # high precision: selected features are predominantly the true ones (recovery floors)
     @test length(intersect(sel_x, Set(1:nz1))) / max(1, length(sel_x)) > 0.7
     @test length(intersect(sel_z, Set(1:nz2))) / max(1, length(sel_z)) > 0.7
     @test m.cors[1] > 0.5                          # recovers strong correlation
@@ -106,7 +107,7 @@ end
     @test _l1n(ones(9)) ≈ 3.0                      # 9/3 = √9
     a = randn(60); λ = 0.5
     @test _l1ns(a, λ) ≈ _l1n(sign.(a) .* max.(abs.(a) .- λ, 0.0))
-    @test _l1n(randn(30)) >= 1 - 1e-9              # ≥1 for nonzero
+    @test _l1n(randn(30)) >= 1 - tol_ord           # ≥1 for nonzero
 end
 
 @testset "internal: _l1diff (L1 distance)" begin
@@ -126,7 +127,7 @@ end
     λ = _bsearch(z, 3.0)
     @test λ > 0
     @test λ <= maximum(abs, z)
-    @test isapprox(_l1ns(z, λ), 3.0; atol = 1e-2)  # hits the budget
+    @test isapprox(_l1ns(z, λ), 3.0; atol = tol_r) # hits the budget (search precision)
     @test _bsearch(z, 2.0) >= _bsearch(z, 4.0)     # tighter ⇒ larger λ
 end
 
@@ -147,12 +148,12 @@ end
     V = _fiv(x, z, K)
     @test size(V) == (p2, K)                       # init for v lives in z's feature space
     # columns are orthonormal (taken from an SVD's U factor)
-    @test V' * V ≈ I(K) atol = 1e-8
+    @test V' * V ≈ I(K) atol = tol_ord
     # matches the documented construction: U of svd(zᵀ · sqrt(xxᵀ))
     xx_sqrt = BRS._matsqrt(x * transpose(x))
     Vref = svd(transpose(z) * xx_sqrt).U[:, 1:K]
     for k in 1:K
-        @test abs(dot(V[:, k], Vref[:, k])) > 0.999  # equal up to sign
+        @test abs(dot(V[:, k], Vref[:, k])) > 1 - tol_ord  # equal up to sign
     end
 end
 
@@ -181,18 +182,18 @@ end
 
     d = sccacore(u, v, x, z, v0, px, pz, 50, vold, zv, xu, argu, argv, su, sv)
 
-    # the canonical vectors come out unit-norm
-    @test isapprox(norm(u), 1.0; atol = 1e-6)
-    @test isapprox(norm(v), 1.0; atol = 1e-6)
+    # the canonical vectors come out unit-norm (iterative core ⇒ tol_julia)
+    @test isapprox(norm(u), 1.0; atol = tol_julia)
+    @test isapprox(norm(v), 1.0; atol = tol_julia)
     # penalty actually induced sparsity (some features zeroed)
     @test count(!iszero, u) < p1
     @test count(!iszero, v) < p2
-    # d = uᵀXᵀZv = ⟨Xu, Zv⟩, and it should be positive & sizeable given the latent
+    # d = uᵀXᵀZv = ⟨Xu, Zv⟩ — exact identity (the function's return contract)
     @test d ≈ dot(x * u, z * v)
     @test d > 0
-    # the canonical variates are genuinely correlated (the latent was recovered)
+    # the canonical variates are genuinely correlated (recovery floor)
     @test abs(cor(x * u, z * v)) > 0.5
-    # the selected features concentrate on the planted ones (precision)
+    # the selected features concentrate on the planted ones (precision floors)
     sel_u = Set(findall(!iszero, u)); sel_v = Set(findall(!iszero, v))
     @test length(intersect(sel_u, Set(1:8)))  / max(1, length(sel_u)) > 0.6
     @test length(intersect(sel_v, Set(1:10))) / max(1, length(sel_v)) > 0.6
@@ -226,15 +227,15 @@ end
                  penaltyx = px, penaltyz = pz, K = K, niter = niter)
 
         for k in 1:K
-            # sign-invariant loading agreement
-            @test abs(cor(m.u[:, k], ru[:, k])) > 0.99
-            @test abs(cor(m.v[:, k], rv[:, k])) > 0.99
+            # sign-invariant loading agreement (cross-language ⇒ tol_r bar)
+            @test abs(cor(m.u[:, k], ru[:, k])) > 1 - tol_r
+            @test abs(cor(m.v[:, k], rv[:, k])) > 1 - tol_r
             # selected-feature sets match
             @test Set(findall(!iszero, m.u[:, k])) == Set(findall(!iszero, ru[:, k]))
             @test Set(findall(!iszero, m.v[:, k])) == Set(findall(!iszero, rv[:, k]))
         end
-        # d and correlations match (cross-implementation ⇒ loose bar)
-        @test isapprox(m.d, rd_; rtol = 1e-3)
-        @test isapprox(m.cors, rcors; rtol = 1e-3)
+        # d and correlations match (cross-language)
+        @test isapprox(m.d, rd_; rtol = tol_r)
+        @test isapprox(m.cors, rcors; rtol = tol_r)
     end
 end
