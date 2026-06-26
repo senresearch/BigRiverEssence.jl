@@ -53,60 +53,67 @@ print("cov : "); mcov = @time BigRiverSchneider.pca(X; k = k, method = :cov);
 
 
 
-# Optimization check — full output comparison
-using BigRiverSchneider
-using BenchmarkTools, Random, LinearAlgebra
-Random.seed!(1234)
-X = randn(500, 300)
+# bench_pca.jl — correctness + speed for BigRiverSchneider.pca vs MultivariateStats.PCA
+# Uses @btime so time AND allocations print inline for every method/size.
+# Run:  julia --project bench_pca.jl
 
-# helper: compare two pcaStructures field by field
-function compare_pca(a, b; label="")
-    println("--- $label ---")
-    println("  mean      ‖diff‖: ", norm(a.mean .- b.mean))
-    println("  scale     ‖diff‖: ", norm(a.scale .- b.scale))
-    # loadings: sign of each PC is arbitrary, compare up to sign via abs
-    println("  loadings  ‖diff‖ (abs): ", norm(abs.(a.loadings) .- abs.(b.loadings)))
-    println("  variances ‖diff‖: ", norm(a.variances .- b.variances))
-    println("  propOFvar ‖diff‖: ", norm(a.propOFvar .- b.propOFvar))
-    # also check dimensions match
-    println("  loadings size match: ", size(a.loadings) == size(b.loadings))
+using BigRiverSchneider
+using LinearAlgebra, Statistics, Random, BenchmarkTools, Printf
+import MultivariateStats; const MVS = MultivariateStats
+const BRS = BigRiverSchneider
+
+# sign-invariant loading agreement (0 = identical up to per-column sign)
+colmisalign(A, B) = maximum(1 - abs(dot(normalize(A[:,j]), normalize(B[:,j]))) for j in 1:size(A,2))
+
+hr() = println("="^80)
+
+# (n, p, k, label) — tall, square, wide
+cases = [(500,   40,  6, "tall   n>>p"),
+         (2000, 100, 10, "tall   n>>p (bigger)"),
+         (5000, 200, 20, "tall   n>>p (large)"),
+         (100,  100, 10, "square n=p"),
+         (200,  500, 20, "wide   p>n"),
+         (300, 1000, 30, "wide   p>n (bigger)")]
+
+hr()
+println("  PCA  —  BigRiverSchneider.pca  vs  MultivariateStats.PCA")
+println("  correctness: sign-invariant loading misalignment (1-|cos|), want < 1e-8")
+println("  timing: @btime (min time + allocations) for BRS :auto/:cov/:svd and MVS")
+hr()
+
+for (n, p, k, label) in cases
+    Random.seed!(1)
+    X = randn(n, p)                                    # BRS.pca: observations in ROWS
+    Xt = permutedims(X)                                # MVS: variables in ROWS
+
+    rm   = MVS.fit(MVS.PCA, Xt; maxoutdim = k, pratio = 1.0)
+    Vmvs = MVS.projection(rm)
+
+    println()
+    @printf("  [%s]   n=%d p=%d k=%d   (auto picks %s)\n",
+            label, n, p, k, n >= p ? ":cov" : ":svd")
+
+    # --- correctness: each BRS path vs MVS (loadings + variances) ---
+    for meth in (:auto, :cov, :svd)
+        m  = BRS.pca(X; k = k, method = meth)
+        d  = colmisalign(m.loadings, Vmvs)
+        dv = maximum(abs.(sort(m.variances) .- sort(MVS.principalvars(rm)[1:k])))
+        @printf("    match :%-5s  loading 1-|cos| = %.2e   var Δ = %.2e   %s\n",
+                meth, d, dv, (d < 1e-8 && dv < 1e-6) ? "✓" : "✗")
+    end
+
+    # --- timing: @btime prints time + allocations inline for each ---
+    println("    timing (@btime):")
+    print("      BRS :auto : "); @btime BRS.pca($X; k = $k, method = :auto);
+    print("      BRS :cov  : "); @btime BRS.pca($X; k = $k, method = :cov);
+    print("      BRS :svd  : "); @btime BRS.pca($X; k = $k, method = :svd);
+    print("      MVS       : "); @btime MVS.fit(MVS.PCA, $Xt; maxoutdim = $k, pratio = 1.0);
 end
 
-# ---- correctness: svd ----
-ref  = pca(X; method=:svd)
-opt  = pca_opt(X; method=:svd)
-compare_pca(ref, opt; label="svd: orig vs opt")
-
-# ---- correctness: cov ----
-refc = pca(X; method=:cov)
-optc = pca_opt(X; method=:cov)
-compare_pca(refc, optc; label="cov: orig vs opt")
-
-# ---- correctness: transform & inverse-transform ----
-# the scores and reconstruction should match between orig and opt models
-sc_ref = pca_transform(ref, X)
-sc_opt = pca_transform(opt, X)
-println("\n--- transform (scores) ---")
-println("  scores ‖diff‖ (abs): ", norm(abs.(sc_ref) .- abs.(sc_opt)))   # abs: sign follows loadings
-
-rc_ref = pca_invtransform(ref, sc_ref)
-rc_opt = pca_invtransform(opt, sc_opt)
-println("--- inverse transform (reconstruction) ---")
-println("  reconstruction ‖diff‖: ", norm(rc_ref .- rc_opt))   # no abs: sign cancels in round-trip
-# bonus: round-trip should recover X closely (full k)
-println("  round-trip ‖X - recon‖ (orig): ", norm(X .- rc_ref))
-
-# ---- benchmark ----
-println("\n=== svd ===")
-print("orig: "); @btime pca($X; method=:svd);
-print("opt : "); @btime pca_opt($X; method=:svd);
-println("=== cov ===")
-print("orig: "); @btime pca($X; method=:cov);
-print("opt : "); @btime pca_opt($X; method=:cov);
-
-
-
-
-
-
-
+hr()
+println("  Done.")
+println("  :auto picks :cov for tall (n>=p), :svd for wide (p>n).")
+println("  Watch the :cov match column on tall sizes — it validates the XᵀX−nμμᵀ")
+println("  scatter trick. If :cov misaligns more than :svd, revert :cov to explicit")
+println("  centering. On tall shapes BRS :auto (=:cov) should beat MVS.")
+hr()

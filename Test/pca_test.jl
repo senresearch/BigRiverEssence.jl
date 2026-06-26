@@ -147,5 +147,5 @@ end
     X = randn(50, 8)
     @test_throws ArgumentError pca(X; k=0)
     @test_throws ArgumentError pca(X; k=9)                    # k > min(n,p)=8
-    @test_throws ErrorException pca(X; method=:IWontMention)  # unknown method
+    @test_throws ArgumentError pca(X; method = :IWontMention)  # unknown method
 end
