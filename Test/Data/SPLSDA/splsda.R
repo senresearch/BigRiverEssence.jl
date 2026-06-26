@@ -4,6 +4,7 @@
 # Requires: BiocManager::install("mixOmics")
 
 suppressMessages(library(mixOmics))
+set.seed(12345678)
 data(srbct)
 
 # subset: 60 samples, 200 genes, ncomp=2, keepX=15 each 
