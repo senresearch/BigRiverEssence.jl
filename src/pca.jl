@@ -1,5 +1,5 @@
 """
-    pcaStructure{T}
+	pcaStructure{T}
 
 Container for a fitted PCA model, as returned by `pca`
 # Fields
@@ -16,15 +16,15 @@ Container for a fitted PCA model, as returned by `pca`
   component (variances ./ total variance)
 """
 struct pcaStructure{T}
-    mean::Vector{T}
-    scale::Vector{T}
-    loadings::Matrix{T}
-    variances::Vector{T}
-    propOFvar::Vector{T}
+	mean::Vector{T}
+	scale::Vector{T}
+	loadings::Matrix{T}
+	variances::Vector{T}
+	propOFvar::Vector{T}
 end
 
 """
-    pca_transform(m::pcaStructure, X::Matrix{Float64})
+	pca_transform(m::pcaStructure, X::Matrix{Float64})
 
 Project data onto the principal directions of a fitted PCA model
 # Arguments
@@ -35,12 +35,14 @@ Project data onto the principal directions of a fitted PCA model
 2d array of floats; the n×k matrix of principal-component scores
 """
 function pca_transform(m::pcaStructure, X::Matrix{Float64})
-    Xc = (X .- m.mean') ./ m.scale'    # center and scale using the stored stats
-    return Xc * m.loadings             # project onto the principal directions
+	# Apply the SAME centering and scaling the model learned, then project. Using
+	# the stored stats (not X's own mean/std) is what makes this valid for new data.
+	Xcentered = (X .- m.mean') ./ m.scale'
+	return Xcentered * m.loadings
 end
 
 """
-    pca_invtransform(m::pcaStructure, scores::Matrix{Float64})
+	pca_invtransform(m::pcaStructure, scores::Matrix{Float64})
 
 Reconstruct data in the original feature space from principal-component scores
 # Arguments
@@ -53,13 +55,15 @@ Reconstruct data in the original feature space from principal-component scores
 when all components are retained (k = p); otherwise a low-rank approximation
 """
 function pca_invtransform(m::pcaStructure, scores::Matrix{Float64})
-    Xc = scores * m.loadings'          # back to full feature width (centered space)
-    return Xc .* m.scale' .+ m.mean'   # undo the scaling, then undo the centering
+	# Reverse the forward transform in reverse order: undo the projection first
+	# (scores → centered feature space), then undo scaling, then undo centering.
+	Xcentered = scores * m.loadings'
+	return Xcentered .* m.scale' .+ m.mean'
 end
 
 """
-    pca(X::Matrix{Float64}; k::Int = minimum(size(X)),
-        standardize::Bool = false, method::Symbol = :auto)
+	pca(X::Matrix{Float64}; k::Int = minimum(size(X)),
+		standardize::Bool = false, method::Symbol = :auto)
 
 Fit a principal component analysis (PCA) model
 # Arguments
@@ -75,60 +79,68 @@ A `pcaStructure` holding the column means, scales, k loadings, component varianc
 and proportion of variance explained
 """
 function pca(X::Matrix{Float64}; k::Int = minimum(size(X)),
-             standardize::Bool = false, method::Symbol = :auto)
-    n, p = size(X)
-    1 <= k <= min(n, p) || throw(ArgumentError("k=$k must be in 1:min(n,p)=$(min(n,p))"))
+	standardize::Bool = false, method::Symbol = :auto)
+	n, p = size(X)
+	1 <= k <= min(n, p) || throw(ArgumentError("k=$k must be in 1:min(n,p)=$(min(n,p))"))
 
-    # choose the cheaper decomposition by shape: tall ⇒ small p×p covariance,
-    # wide ⇒ SVD of the data matrix
-    if method === :auto
-        method = n >= p ? :cov : :svd
-    end
-    method in (:cov, :svd) || throw(ArgumentError("method must be :auto, :cov, or :svd, got :$method"))
+	# Pick the cheaper decomposition by data shape. A tall matrix (more observations
+	# than features) gives a small p×p covariance to eigendecompose; a wide matrix
+	# is cheaper to attack with an SVD of the data itself. Resolve :auto first so the
+	# validation below sees a concrete method.
+	if method === :auto
+		method = n >= p ? :cov : :svd
+	end
+	method in (:cov, :svd) || throw(ArgumentError("method must be :auto, :cov, or :svd, got :$method"))
 
-    means = vec(mean(X, dims = 1))                          # column means (length p)
-    sigma = standardize ? vec(std(X, dims = 1)) : Float64[] # empty sentinel = "no scaling"
+	colmeans = vec(mean(X, dims = 1))                          # column means (length p)
+	colstds  = standardize ? vec(std(X, dims = 1)) : Float64[] # empty vector = "not standardizing"
 
-    if method === :cov
-        # Build the p×p scatter S = Xcᵀ Xc WITHOUT materializing a centered copy.
-        # Xcᵀ Xc = Xᵀ X − n·(means meansᵀ), a rank-1 correction to the raw Gram.
-        Smat = mul!(Matrix{Float64}(undef, p, p), transpose(X), X)   # Xᵀ X
-        @inbounds for j in 1:p, i in 1:p
-            Smat[i, j] -= n * means[i] * means[j]          # subtract n·μμᵀ ⇒ centered scatter
-        end
-        if standardize                                     # fold in column scaling: S ← D⁻¹ S D⁻¹
-            @inbounds for j in 1:p, i in 1:p
-                Smat[i, j] /= (sigma[i] * sigma[j])
-            end
-        end
-        Ssym = Symmetric(Smat)
+	if method === :cov
+		# Build the p×p scatter matrix S = Xcᵀ Xc WITHOUT ever forming a centered
+		# copy of X. The identity Xcᵀ Xc = Xᵀ X − n·(μ μᵀ) lets us start from the raw
+		# Gram matrix and apply a rank-1 correction — saving an n×p allocation.
+		scatter = mul!(Matrix{Float64}(undef, p, p), transpose(X), X)   # raw Gram, Xᵀ X
+		@inbounds for j in 1:p, i in 1:p
+			scatter[i, j] -= n * colmeans[i] * colmeans[j]    # subtract n·μμᵀ ⇒ centered scatter
+		end
+		if standardize                                        # fold column scaling in: S ← D⁻¹ S D⁻¹
+			@inbounds for j in 1:p, i in 1:p
+				scatter[i, j] /= (colstds[i] * colstds[j])
+			end
+		end
+		scatter_sym = Symmetric(scatter)
 
-        total = tr(Ssym) / (n - 1)                         # total variance = trace, no extra data pass
-        E = eigen(Ssym, p - k + 1 : p)                     # only the top k eigenpairs
-        vars = reverse(E.values) ./ (n - 1)                # reorder to descending
-        V = E.vectors[:, k:-1:1]                           # loadings, descending
-    else  # :svd  — center, then SVD in the orientation LAPACK prefers (tall ≥ wide)
-        Xc = standardize ? (X .- means') ./ vec(std(X, dims = 1))' : X .- means'
-        if p > n
-            # wide data: SVD the TALL transpose Xcᵀ (p×n). LAPACK's SVD is faster on
-            # tall matrices; the loadings we want are then the LEFT singular vectors
-            # of Xcᵀ (= right singular vectors of Xc).
-            F = svd!(permutedims(Xc))                      # Xcᵀ is p×n (tall)
-            s = @view F.S[1:k]
-            vars = collect(s .^ 2 ./ (n - 1))
-            V = Matrix(@view F.U[:, 1:k])                  # ← U (transpose ⇒ left vecs are the loadings)
-            total = sum(abs2, F.S) / (n - 1)
-        else
-            # tall (or square) data: SVD Xc directly; loadings are the right singular vectors
-            F = svd!(Xc)
-            s = @view F.S[1:k]
-            vars = collect(s .^ 2 ./ (n - 1))
-            V = Matrix(@view F.V[:, 1:k])
-            total = sum(abs2, F.S) / (n - 1)
-        end
-    end
+		# Total variance is the trace of the (scaled) covariance — read it straight
+		# off the scatter's diagonal, no extra pass over the data.
+		total = tr(scatter_sym) / (n - 1)
+		# eigen with a range asks LAPACK for only the top-k eigenpairs (cheaper than
+		# a full decomposition). They come back ascending, so reverse to descending.
+		topk = eigen(scatter_sym, (p-k+1):p)
+		vars = reverse(topk.values) ./ (n - 1)
+		loadings = topk.vectors[:, k:-1:1]                    # reorder columns to descending variance
+	else  # :svd — center first, then SVD in whichever orientation LAPACK handles faster
+		Xcentered = standardize ? (X .- colmeans') ./ vec(std(X, dims = 1))' : X .- colmeans'
+		if p > n
+			# Wide data: SVD the TALL transpose Xcᵀ (p×n) because LAPACK's SVD runs
+			# faster on tall matrices. The loadings we want — the right singular
+			# vectors of Xc — are the LEFT singular vectors of Xcᵀ, so we read F.U.
+			F = svd!(permutedims(Xcentered))                  # Xcᵀ is p×n (tall)
+			svals = @view F.S[1:k]
+			vars = collect(svals .^ 2 ./ (n - 1))
+			loadings = Matrix(@view F.U[:, 1:k])              # U of the transpose = the loadings
+			total = sum(abs2, F.S) / (n - 1)
+		else
+			# Tall (or square) data: SVD Xc directly; the loadings are its right
+			# singular vectors F.V.
+			F = svd!(Xcentered)
+			svals = @view F.S[1:k]
+			vars = collect(svals .^ 2 ./ (n - 1))
+			loadings = Matrix(@view F.V[:, 1:k])
+			total = sum(abs2, F.S) / (n - 1)
+		end
+	end
 
-    SignConsistency_opt!(V)                                # fix arbitrary PC signs for reproducibility
-    scale_out = standardize ? sigma : ones(Float64, p)     # store ones when not standardizing
-    return pcaStructure{Float64}(means, scale_out, V, vars, vars ./ total)
+	SignConsistency_opt!(loadings)                            # pin each PC's arbitrary sign for reproducibility
+	scale_out = standardize ? colstds : ones(Float64, p)      # store ones when not standardizing
+	return pcaStructure{Float64}(colmeans, scale_out, loadings, vars, vars ./ total)
 end

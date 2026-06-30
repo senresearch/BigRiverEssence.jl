@@ -12,14 +12,14 @@ export pcaStructure, pca, pca_transform, pca_invtransform
 include("pmd.jl")
 export pmdStructure, pmd
 
-include("spc.jl") 
-export  spcStructure, spc, spc_orth
+include("spc.jl")
+export spcStructure, spc, spc_orth
 
-include("plskern.jl") 
-export  plskernStructure, plskern, plskerncoef, plskernpredict, plskerntransform
+include("plskern.jl")
+export plskernStructure, plskern, plskerncoef, plskernpredict, plskerntransform
 
-include("jive.jl") 
-export  jiveStructure, jive
+include("jive.jl")
+export jiveStructure, jive
 
 include("splsda.jl")
 export splsdaStructure, splsda
@@ -33,4 +33,4 @@ export sccaStructure, scca
 
 
 
-end 
+end

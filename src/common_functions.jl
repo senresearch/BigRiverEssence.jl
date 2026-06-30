@@ -1,6 +1,6 @@
 
 """
-    SignConsistency_opt!(V)
+	SignConsistency_opt!(V)
 
 Fix the sign of each column of a loading matrix so the largest-magnitude entry is
 positive, in place
@@ -15,16 +15,21 @@ runs and comparable across implementations. An all-zero column (whose largest
 entry has sign 0) is left untouched
 """
 function SignConsistency_opt!(V)
-    @inbounds for c in eachcol(V)
-        mi = 1; mv = abs(c[1])
-        for i in 2:length(c)                 # find the index of the largest-magnitude entry
-            a = abs(c[i])
-            if a > mv; mv = a; mi = i; end
-        end
-        s = sign(c[mi])
-        s != 0 && (c .*= s)                  # flip the whole column if that entry is negative
-    end
-    return V
+	@inbounds for c in eachcol(V)
+		mi = 1;
+		mv = abs(c[1])
+		for i in 2:length(c)                 # find the index of the largest-magnitude entry
+			a = abs(c[i])
+			if a > mv
+				;
+				mv = a;
+				mi = i;
+			end
+		end
+		s = sign(c[mi])
+		s != 0 && (c .*= s)                  # flip the whole column if that entry is negative
+	end
+	return V
 end
 
 
