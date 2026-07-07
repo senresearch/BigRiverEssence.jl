@@ -72,7 +72,7 @@ two-dimensional *score*. Coloring by species reveals what PCA found.
 
 ```@example
 
-scores = BRE.pca_transform(m, X)          # 150×4 scores
+scores = pca_transform(m, X)          # 150×4 scores
 scatter(scores[:, 1], scores[:, 2]; group = species,
     xlabel = "PC1", ylabel = "PC2",
     title = "iris using first two  principal components",
@@ -128,7 +128,7 @@ exact as the difference between the two matrices are larger than when we used al
 
 ```@example
 m2 = pca(X; k = 2, standardize = true)
-X_approx = BRE.pca_invtransform(m2, BRE.pca_transform(m2, X))
+X_approx = pca_invtransform(m2, pca_transform(m2, X))
 maximum(abs.(X .- X_approx))      # small, but nonzero
 ```
 
