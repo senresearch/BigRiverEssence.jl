@@ -40,7 +40,7 @@ variables to unit variance. We fit `pca` on the data matrix `X` while considerin
 
 
 ```@example
-m = pca(X; standardize = true)
+m = BigRiverEssence.pca(X; standardize = true)
 m.propOFvar
 ```
 
