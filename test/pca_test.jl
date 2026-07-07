@@ -116,7 +116,7 @@ end
 end
 
 @testset "sign consistency" begin
-	# Loading signs are arbitrary, so we canonicalize them: SignConsistency_opt!
+	# Loading signs are arbitrary, so we canonicalize them: sign_consistency_opt!
 	# flips each column so its largest-magnitude entry is positive. This makes
 	# results reproducible run-to-run and comparable across implementations.
 	Random.seed!(5)

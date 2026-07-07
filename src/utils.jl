@@ -1,6 +1,6 @@
 
 """
-	SignConsistency_opt!(V)
+	sign_consistency_opt!(V)
 
 Fix the sign of each column of a loading matrix so the largest-magnitude entry is
 positive, in place
@@ -14,7 +14,7 @@ up to a sign, so this canonicalizes the choice to make results reproducible acro
 runs and comparable across implementations. An all-zero column (whose largest
 entry has sign 0) is left untouched
 """
-function SignConsistency_opt!(V)
+function sign_consistency_opt!(V)
 	@inbounds for c in eachcol(V)
 		mi = 1;
 		mv = abs(c[1])

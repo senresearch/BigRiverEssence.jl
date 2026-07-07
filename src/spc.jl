@@ -9,7 +9,7 @@ Container for a fitted sparse principal component analysis, as returned by
 - `scale::Vector{T}`: The column scales (length p) — the column standard
   deviations when `standardize=true`, otherwise ones
 - `loadings::Matrix{T}`: The p×k sparse loadings (one unit-ℓ₂, L1-penalized
-  column per component), signs fixed by `SignConsistency_opt!`
+  column per component), signs fixed by `sign_consistency_opt!`
 - `variances::Vector{T}`: The variance associated with each of the k components
   (dₖ² / (n-1), where dₖ is the component weight)
 - `propOFvar::Vector{T}`: The cumulative proportion of variance explained by the
@@ -296,7 +296,7 @@ function spc(X; k = 2, c = sqrt(size(X, 2)) / 2, standardize = false,
 		BLAS.ger!(-d[j], u, v, Rmat)                   # rank-1 deflation: Rmat ← Rmat − d·u·vᵀ
 	end                                                # so the next component sees only what's left
 
-	SignConsistency_opt!(V)                            # fix arbitrary per-column signs for reproducibility
+	sign_consistency_opt!(V)                            # fix arbitrary per-column signs for reproducibility
 	vars = d .^ 2 ./ (n - 1)                           # variance carried by each component (dₖ² / (n-1))
 	# PVE uses the adjusted-variance measure since sparse loadings aren't orthonormal
 	return spcStructure{T}(means, sigma, V, vars, prop_var_explained(Xc, V))
@@ -366,7 +366,7 @@ function spc_orth(X; k = 2, c = sqrt(size(X, 2)) / 2, standardize = false,
 		@views U[:, j] .= u                            # store the scores direction (needed to orthogonalize later components)
 	end
 
-	SignConsistency_opt!(V)                            # fix arbitrary per-column signs for reproducibility
+	sign_consistency_opt!(V)                            # fix arbitrary per-column signs for reproducibility
 	vars = d .^ 2 ./ (n - 1)                           # variance carried by each component (dₖ² / (n-1))
 	# PVE uses the adjusted-variance measure since sparse loadings aren't orthonormal
 	return spcStructure{T}(means, sigma, V, vars, prop_var_explained(Xc, V))

@@ -140,7 +140,7 @@ function pca(X::Matrix{Float64}; k::Int = minimum(size(X)),
 		end
 	end
 
-	SignConsistency_opt!(loadings)                            # pin each PC's arbitrary sign for reproducibility
+	sign_consistency_opt!(loadings)                            # pin each PC's arbitrary sign for reproducibility
 	scale_out = standardize ? colstds : ones(Float64, p)      # store ones when not standardizing
 	return pcaStructure{Float64}(colmeans, scale_out, loadings, vars, vars ./ total)
 end
