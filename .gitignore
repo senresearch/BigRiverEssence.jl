@@ -31,3 +31,4 @@ JuliaLocalPreferences.toml
 .DS_Store
 
 docs/build/
+docs/src/index.md

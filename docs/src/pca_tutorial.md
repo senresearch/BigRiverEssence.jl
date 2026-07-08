@@ -14,7 +14,7 @@ In this documentation, we will depomstrate implementation of PCA using `BigRiver
  
 
 
-```@example
+```@example pca
 using BigRiverEssence
 using RDatasets, DataFrames, Plots, Statistics, LinearAlgebra
 
@@ -39,7 +39,7 @@ Measurements of the different columns can be at different scales, hence it is al
 variables to unit variance. We fit `pca` on the data matrix `X` while considering standardized columns of `X`. We can get the proportion of total variance explained by each of the four principal components using `propOFvar`. 
 
 
-```@example
+```@example pca
 m = BigRiverEssence.pca(X; standardize = true)
 m.propOFvar
 ```
@@ -52,7 +52,7 @@ iris data.
 A scree plot is just a bar plot where each bar shows the variance captured by each individual component. The "elbow" in the scree plot is a good indicator that can help decide how many components are worth keeping. We can use `propOFvar` to get the scree plot.
 
 
-```@example
+```@example pca
 pve = m.propOFvar
 bar(pve .* 100;
     xlabel = "Principal component", ylabel = "% of variance explained",
@@ -70,7 +70,7 @@ two-dimensional *score*. Coloring by species reveals what PCA found.
 
 
 
-```@example
+```@example pca
 
 scores = pca_transform(m, X)          # 150×4 scores
 scatter(scores[:, 1], scores[:, 2]; group = species,
@@ -91,7 +91,7 @@ A biplot iscatterplot of the scores from the first two principal components over
 
 
 
-```@example
+```@example pca
 L = m.loadings
 arrowscale = 3.0
 
@@ -117,7 +117,7 @@ We just saw that`pca_transform` projects the original data matrix down to compon
 maps the scores back into the original four measurements. If we keep all the components, we should be able to recover the data matrix exactly. 
 
 
-```@example
+```@example pca
 X_recon = pca_invtransform(m, scores)
 maximum(abs.(X .- X_recon))   
 ```
@@ -126,7 +126,7 @@ We see from the above output, keeping all the components, we are able to reconst
 exact as the difference between the two matrices are larger than when we used all components for the reconstruction. 
 
 
-```@example
+```@example pca
 m2 = pca(X; k = 2, standardize = true)
 X_approx = pca_invtransform(m2, pca_transform(m2, X))
 maximum(abs.(X .- X_approx))      # small, but nonzero
