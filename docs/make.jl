@@ -9,7 +9,7 @@ end
 makedocs(; modules=[BigRiverEssence], sitename="BigRiverEssence.jl", pages=[
         "Home" => "index.md",
         "Principal Component Analysis" => "pca_tutorial.md",
-        
+        "Penalized Matrix Decomposition" => "pmd_tutorial.md",
         "API Reference" => "api.md", 
         # "Example: MLM for ordinal predictors" => "example_ordinal_data.md",
         # "Types and Functions" => "functions.md",
