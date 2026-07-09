@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Joint and Individual Variation Explained · BigRiverEssence.jl</title><meta name="title" content="Joint and Individual Variation Explained · BigRiverEssence.jl"/><meta property="og:title" content="Joint and Individual Variation Explained · BigRiverEssence.jl"/><meta property="twitter:title" content="Joint and Individual Variation Explained · BigRiverEssence.jl"/><meta name="description" content="Documentation for BigRiverEssence.jl."/><meta property="og:description" content="Documentation for BigRiverEssence.jl."/><meta property="twitter:description" content="Documentation for BigRiverEssence.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">BigRiverEssence.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../pca_tutorial/">Principal Component Analysis</a></li><li><a class="tocitem" href="../pmd_tutorial/">Penalized Matrix Decomposition</a></li><li><a class="tocitem" href="../spc_tutorial/">Sparse Principal Component Analysis</a></li><li><a class="tocitem" href="../plskern_tutorial/">Partial Least Squares kernal Regression</a></li><li><a class="tocitem" href="../splsda_tutorial/">Sparse Partial Least Squares Discriminant Analysis</a></li><li class="is-active"><a class="tocitem" href>Joint and Individual Variation Explained</a><ul class="internal"><li><a class="tocitem" href="#The-method"><span>The method</span></a></li><li><a class="tocitem" href="#The-data"><span>The data</span></a></li><li><a class="tocitem" href="#Fitting-the-model"><span>Fitting the model</span></a></li><li><a class="tocitem" href="#Preparing-for-the-figures"><span>Preparing for the figures</span></a></li><li><a class="tocitem" href="#Figure-1:-The-variation-explained"><span>Figure 1: The variation explained</span></a></li><li><a class="tocitem" href="#Figure-2:-Heatmaps:-Data-Joint-Individual-Noise"><span>Figure 2: Heatmaps: Data = Joint + Individual + Noise</span></a></li><li><a class="tocitem" href="#Figure-3:-Joint-structure-by-cluster"><span>Figure 3: Joint structure by cluster</span></a></li><li><a class="tocitem" href="#Figure-4-—-Joint-and-individual-components-together"><span>Figure 4 — Joint and individual components together</span></a></li><li><a class="tocitem" href="#Summary"><span>Summary</span></a></li><li><a class="tocitem" href="#References"><span>References</span></a></li></ul></li><li><a class="tocitem" href="../api/">API Reference</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Joint and Individual Variation Explained</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Joint and Individual Variation Explained</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/senresearch/BigRiverEssence.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/senresearch/BigRiverEssence.jl/blob/main/docs/src/jive_tutorial.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="JIVE:-Joint-and-Individual-Variation-Explained"><a class="docs-heading-anchor" href="#JIVE:-Joint-and-Individual-Variation-Explained">JIVE: Joint and Individual Variation Explained</a><a id="JIVE:-Joint-and-Individual-Variation-Explained-1"></a><a class="docs-heading-anchor-permalink" href="#JIVE:-Joint-and-Individual-Variation-Explained" title="Permalink"></a></h1><p>Joint and Individual Variation Explained or JIVE is a matrix decomposition technique. If we have several blocks of data sharing the same observations, IVE decomposes them into three parts: a joint structure which is common to all blocks, an individual structure which is specific to each block, and residual noise. The main goal of JIVE is to separate the variation the measurements share from the variation unique to each.</p><p>In this documentation, we will reproduce the analysis from the <code>r.jive</code> package vignette using <code>BigRiverEssence.jive</code> where we will consider three genomic data blocks (gene expression, methylation, and miRNA) measured on the same breast cancer tumor samples and we will decomposed into their joint and individual structure.</p><h2 id="The-method"><a class="docs-heading-anchor" href="#The-method">The method</a><a id="The-method-1"></a><a class="docs-heading-anchor-permalink" href="#The-method" title="Permalink"></a></h2><p>Let us consider <span>$k$</span> data blocks <span>$X_1, \dots, X_k$</span>. Each of the data blocks have the same <span>$n$</span> samples but with different features (so <span>$X_i$</span> is <span>$p_i \times n$</span>). We can obtain total variation by stacking them. JIVE splits each block as <span>$X_i = J_i + A_i + \varepsilon_i,$</span> where <span>$J_i$</span> is the joint structure, <span>$A_i$</span> the individual structure, and <span>$\varepsilon_i$</span> is the noise. The joint structures <span>$J_1, \dots, J_k$</span> share a common row space where a set of <span>$r$</span> patterns across samples that appear in every block, whereas each individual structure <span>$A_i$</span> lies in a space orthogonal to the joint one, capturing what is specific to block <span>$i$</span>.</p><p>Similar to <code>r.jive</code>, <code>BigRiverEssence.jive</code> finds this decomposition by alternating between two steps. Given the individual structures, the joint structure can be considered as the ranked <span>$r$</span> approximation of the stacked residual (which is data minus individual). Now, given the joint structure, individual structure of each block is the ranked <span>$r_i$</span> approximation of residual of that block, projected off the joint row space and off the other blocks&#39; individual spaces. it iterates between these two estimates untill convergence, following the &quot;orthIndiv&quot; algorithm of Lock et al. (2013).</p><p>The joint rank <span>$r$</span> and individual ranks <span>$r_i$</span> can either be supplied directly or  they can also be estimated from the data by a permutation test where we consider a componet as a real signal only if the singular value of that component exceeds what is seen after randomly permuting the data to destroy structure.</p><h2 id="The-data"><a class="docs-heading-anchor" href="#The-data">The data</a><a id="The-data-1"></a><a class="docs-heading-anchor-permalink" href="#The-data" title="Permalink"></a></h2><p>We will consider the <code>BRCA</code> dataset. The BRCA dataset contains gene expression (654 genes), DNA methylation (574 CpG sites), and miRNA expression (423 miRNAs) measured on the same 348 breast tumor samples from The Cancer Genome Atlas [1]. It is obtained via the r.jive R package [3], which implements the JIVE method [2].</p><pre><code class="language-julia hljs">using BigRiverEssence, Plots, StatsPlots, Clustering, Distances
+using LinearAlgebra, Statistics, DelimitedFiles</code></pre><pre><code class="language-julia hljs">datadir = joinpath(pkgdir(BigRiverEssence), &quot;reference_Data&quot;, &quot;brcadata&quot;)
+X1 = readdlm(joinpath(datadir, &quot;expression.csv&quot;),  &#39;,&#39;, Float64)   # Expression block
+X2 = readdlm(joinpath(datadir, &quot;methylation.csv&quot;), &#39;,&#39;, Float64)   # Methylation block
+X3 = readdlm(joinpath(datadir, &quot;mirna.csv&quot;),       &#39;,&#39;, Float64)   # miRNA block
+cl = Int.(vec(readdlm(joinpath(datadir, &quot;clusts.csv&quot;), &#39;,&#39;)))      # cluster labels
+
+nm = [&quot;Expression&quot;, &quot;Methylation&quot;, &quot;miRNA&quot;]
+size.((X1, X2, X3), 1), size(X1, 2)     # features per block, shared sample count</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">((645, 574, 423), 348)</code></pre><p>We see from the above output that, each block has the same number of columns or columns but a different number of rows or features. This is the exact layout <code>jive</code> expects where each block is a <span>$p_i \times n$</span> matrix, sharing <span>$n$</span>.</p><h2 id="Fitting-the-model"><a class="docs-heading-anchor" href="#Fitting-the-model">Fitting the model</a><a id="Fitting-the-model-1"></a><a class="docs-heading-anchor-permalink" href="#Fitting-the-model" title="Permalink"></a></h2><p>Now we fit <code>jive</code> by passing the three blocks with specifying the ranks. This lets <code>jive</code> estimate the ranks by permutation test.</p><pre><code class="language-julia hljs">res = jive([X1, X2, X3])
+rJ  = res.r
+println(&quot;Estimated ranks: joint = $rJ, individual = $(res.ri)&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Estimating ranks via permutation test...
+Estimated joint rank: 2, individual ranks: [27, 26, 25]
+Estimated ranks: joint = 2, individual = [27, 26, 25]</code></pre><p>We note that the permutation test finds a joint rank of <span>$2$</span> which implies that two patterns are shared across all the three data types. We also found that the individual ranks are in the mid-<span>$20$</span>s for each block. The returned <code>jiveStructure</code> holds the joint (<code>J</code>, <code>S</code>, <code>U</code>) and individual (<code>A</code>, <code>Si</code>, <code>Wi</code>) parts along with the ranks.</p><h2 id="Preparing-for-the-figures"><a class="docs-heading-anchor" href="#Preparing-for-the-figures">Preparing for the figures</a><a id="Preparing-for-the-figures-1"></a><a class="docs-heading-anchor-permalink" href="#Preparing-for-the-figures" title="Permalink"></a></h2><p>We scale the data for the variance and heatmap figure exactly as <code>jive</code> scales it internally (row-centered, then Frobenius-normalized so no block dominates).</p><pre><code class="language-julia hljs">nel = [size(X, 1) * size(X, 2) for X in (X1, X2, X3)]; sum_n = sum(nel)
+Dat = [ let Xi = X .- mean(X, dims = 2); Xi ./ (norm(Xi) * sqrt(sum_n)); end
+        for X in (X1, X2, X3) ]
+
+clusters = Int.(cl)
+pal = [:black, :green, :purple]
+colors = [pal[c] for c in clusters]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">348-element Vector{Symbol}:
+ :green
+ :green
+ :black
+ :black
+ :green
+ :black
+ :black
+ :purple
+ :purple
+ :purple
+ ⋮
+ :green
+ :purple
+ :black
+ :green
+ :green
+ :black
+ :green
+ :green
+ :purple</code></pre><h2 id="Figure-1:-The-variation-explained"><a class="docs-heading-anchor" href="#Figure-1:-The-variation-explained">Figure 1: The variation explained</a><a id="Figure-1:-The-variation-explained-1"></a><a class="docs-heading-anchor-permalink" href="#Figure-1:-The-variation-explained" title="Permalink"></a></h2><p>Now we measure the fraction of the variance captured by the joint structure, the individual structure, and left as residual for each block. We plot them as a stacked bar plot. </p><pre><code class="language-julia hljs">VarJ = [norm(res.J[i])^2 / norm(Dat[i])^2 for i in 1:3]
+VarI = [norm(res.A[i])^2 / norm(Dat[i])^2 for i in 1:3]
+VarR = 1 .- VarJ .- VarI
+
+fig1 = groupedbar(nm, [VarR VarI VarJ];
+    bar_position = :stack,
+    label = [&quot;Residual&quot; &quot;Individual&quot; &quot;Joint&quot;],
+    color = [RGB(0.65,0.65,0.65) RGB(0.43,0.43,0.43) RGB(0.2,0.2,0.2)],
+    title = &quot;Variation Explained&quot;, legend = :outertopright,
+    lw = 0.3, linecolor = :black, bar_width = 0.7, ylims = (0,1))</code></pre><img src="1e30b06e.svg" alt="Example block output"/><p>In the above bar plot, each bar shows how variation of one block divides between shared (joint), block-specific (individual), and noise. This is the main result of JIVE which shows how much of each data type is explained by structure common to all three versus structure unique to itself.</p><h2 id="Figure-2:-Heatmaps:-Data-Joint-Individual-Noise"><a class="docs-heading-anchor" href="#Figure-2:-Heatmaps:-Data-Joint-Individual-Noise">Figure 2: Heatmaps: Data = Joint + Individual + Noise</a><a id="Figure-2:-Heatmaps:-Data-Joint-Individual-Noise-1"></a><a class="docs-heading-anchor-permalink" href="#Figure-2:-Heatmaps:-Data-Joint-Individual-Noise" title="Permalink"></a></h2><p>Now we visualize the decomposition directly by displaying each block as the original data along with the joint, individual, and noise components. We order samples by clustering their joint structure, so shared patterns line up across all three blocks.</p><pre><code class="language-julia hljs">Jstack = vcat(res.J...)
+col_order = hclust(pairwise(Euclidean(), Jstack, dims = 2), linkage = :complete).order
+row_orders = [hclust(pairwise(Euclidean(), res.J[i], dims = 1), linkage = :complete).order
+              for i in 1:3]
+
+Wlab = 0.05
+Wcontent = [0.22, 0.04, 0.22, 0.04, 0.22, 0.04, 0.22]
+Wcontent = Wcontent .* (1 - Wlab)           # rescale so everything still sums to 1
+W = vcat(Wlab, Wcontent)                     # 8 columns total
+
+function panel(M, ro; title = &quot;&quot;)
+    Mo = M[ro, col_order]
+    m = mean(Mo); s = std(Mo); lo, hi = m - 3s, m + 3s
+    heatmap(clamp.(Mo, lo, hi); c = :bwr, clim = (lo, hi), title = title,
+        cbar = false, xticks = false, yticks = false,
+        titlefontsize = 11, guidefontsize = 9)
+end
+
+function txt(s; fs = 20, rot = 0)
+    p = plot(framestyle = :none, xlims = (0,1), ylims = (0,1), legend = false)
+    annotate!(p, 0.5, 0.5, text(s, fs, rotation = rot)); return p
+end
+
+function source_row(i)
+    ro = row_orders[i]
+    lab = txt(nm[i]; fs = 14, rot = 90)      # vertical block name, far left
+    D = panel(Dat[i], ro)
+    J = panel(res.J[i], ro)
+    A = panel(res.A[i], ro)
+    N = panel(Dat[i] .- res.J[i] .- res.A[i], ro)
+    plot(lab, D, txt(&quot;=&quot;), J, txt(&quot;+&quot;), A, txt(&quot;+&quot;), N;
+        layout = grid(1, 8, widths = W), size = (1500, 300))
+end
+
+header = plot(txt(&quot;&quot;), txt(&quot;Data&quot;; fs=16), txt(&quot;&quot;), txt(&quot;Joint&quot;; fs=16), txt(&quot;&quot;),
+    txt(&quot;Individual&quot;; fs=16), txt(&quot;&quot;), txt(&quot;Noise&quot;; fs=16);
+    layout = grid(1, 8, widths = W), size = (1500, 60))
+
+fig2 = plot(header, source_row(1), source_row(2), source_row(3);
+    layout = grid(4, 1, heights = [0.08, 0.307, 0.307, 0.306]), size = (1500, 950))</code></pre><img src="286352e2.svg" alt="Example block output"/><h2 id="Figure-3:-Joint-structure-by-cluster"><a class="docs-heading-anchor" href="#Figure-3:-Joint-structure-by-cluster">Figure 3: Joint structure by cluster</a><a id="Figure-3:-Joint-structure-by-cluster-1"></a><a class="docs-heading-anchor-permalink" href="#Figure-3:-Joint-structure-by-cluster" title="Permalink"></a></h2><p>Now, we project the joint structure onto its principal components and color by the sample clusters. This shows us whether the shared variation separates the known tumor subtypes.</p><pre><code class="language-julia hljs">Fj = svd(vcat(res.J...))
+fmt = v -&gt; string(round(v * 1e4, digits = 1))
+
+PCs = Diagonal(Fj.S[1:rJ]) * Fj.Vt[1:rJ, :]
+fig3 = scatter(PCs[2, :], PCs[1, :];
+    color = colors, markershape = :circle, markersize = 4,
+    markerstrokewidth = 1.2, markerstrokecolor = colors, markercolor = :white,
+    xlabel = &quot;Joint 2  (×10⁻⁴)&quot;, ylabel = &quot;Joint 1  (×10⁻⁴)&quot;,
+    title = &quot;Joint Structure, colored by cluster&quot;,
+    legend = false, size = (550, 500), xformatter = fmt, yformatter = fmt)</code></pre><img src="2f34e69e.svg" alt="Example block output"/><p>We can see from the above plot, the joint structures (the variation shared across expression, methylation, and miRNA) were able to separate the sample clusters. This shows that the tumor subtypes differ in ways that are consistently reflected across all three molecular data types.</p><h2 id="Figure-4-—-Joint-and-individual-components-together"><a class="docs-heading-anchor" href="#Figure-4-—-Joint-and-individual-components-together">Figure 4 — Joint and individual components together</a><a id="Figure-4-—-Joint-and-individual-components-together-1"></a><a class="docs-heading-anchor-permalink" href="#Figure-4-—-Joint-and-individual-components-together" title="Permalink"></a></h2><p>Now we construct a matrix of scatterplots where in each of them, we plot the first joint component against the first individual component of each block. This will shows us how joint and block-specific structure relate.</p><pre><code class="language-julia hljs">j1   = (Diagonal(Fj.S[1:1]) * Fj.Vt[1:1, :])[1, :]
+ind1 = [ (let F = svd(res.A[i]); (Diagonal(F.S[1:1]) * F.Vt[1:1, :])[1, :]; end)
+         for i in 1:length(res.A) ]
+
+comps  = [j1, ind1...]
+names4 = [&quot;Joint 1&quot;; [&quot;$(nm[i]) Indiv 1&quot; for i in 1:length(ind1)]]
+nPC = length(comps)
+
+panels = Matrix{Any}(undef, nPC-1, nPC-1)
+for i in 2:nPC, j in 1:(nPC-1)
+    r = i-1; c = j
+    if j &gt;= i
+        panels[r,c] = plot(framestyle = :none)
+    else
+        panels[r,c] = scatter(comps[i], comps[j];
+            color = colors, markershape = :circle, markersize = 3,
+            markerstrokewidth = 1.0, markerstrokecolor = colors, markercolor = :white,
+            xlabel = &quot;$(names4[i])  (×10⁻⁴)&quot;, ylabel = &quot;$(names4[j])  (×10⁻⁴)&quot;,
+            xformatter = fmt, yformatter = fmt,
+            legend = false, tickfontsize = 7, guidefontsize = 8)
+    end
+end
+fig4 = plot(permutedims(panels)...; layout = (nPC-1, nPC-1), size = (1100, 1100))</code></pre><img src="9fdb3804.svg" alt="Example block output"/><p>We note in the above plot, the joint component is able to separats the clusters (as we saw in Figure 3), while the individual components are able to capture the block-specific variation. This portrays the distinction JIVE draws between shared and unique structure.</p><h2 id="Summary"><a class="docs-heading-anchor" href="#Summary">Summary</a><a id="Summary-1"></a><a class="docs-heading-anchor-permalink" href="#Summary" title="Permalink"></a></h2><p>We saw in this example, given three molecular data blocks on the same tumor samples, <code>jive</code> estimated a joint rank of 2 and separated each block into shared structure, block-specific structure, and noise. The joint structure recovered variation reflected across all three data types, while the individual structures isolated what is unique to each. This reproduced the analysis of the <code>r.jive</code> vignette, on the same data. </p><h2 id="References"><a class="docs-heading-anchor" href="#References">References</a><a id="References-1"></a><a class="docs-heading-anchor-permalink" href="#References" title="Permalink"></a></h2><p>[1] Cancer Genome Atlas Network (2012). Comprehensive molecular portraits of human breast     tumours. <em>Nature</em>, 490(7418), 61–70.</p><p>[2] Lock, E. F., Hoadley, K. A., Marron, J. S., &amp; Nobel, A. B. (2013). Joint and Individual     Variation Explained (JIVE) for integrated analysis of multiple data types. <em>The Annals     of Applied Statistics</em>, 7(1), 523–542.</p><p>[3] O&#39;Connell, M. J., &amp; Lock, E. F. (2020). r.jive: Perform JIVE Decomposition for Multi-Source Data. 10.32614/CRAN.package.r.jive</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../splsda_tutorial/">« Sparse Partial Least Squares Discriminant Analysis</a><a class="docs-footer-nextpage" href="../api/">API Reference »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Thursday 9 July 2026 16:27">Thursday 9 July 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
