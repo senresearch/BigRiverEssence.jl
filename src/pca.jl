@@ -119,7 +119,7 @@ function pca(X::Matrix{Float64}; k::Int = minimum(size(X)),
 		vars = reverse(topk.values) ./ (n - 1)
 		loadings = topk.vectors[:, k:-1:1]                    # reorder columns to descending variance
 	else  # :svd — center first, then SVD in whichever orientation LAPACK handles faster
-		Xcentered = standardize ? (X .- colmeans') ./ vec(std(X, dims = 1))' : X .- colmeans'
+		Xcentered = standardize ? (X .- colmeans') ./ colstds' : X .- colmeans'
 		if p > n
 			# Wide data: SVD the TALL transpose Xcᵀ (p×n) because LAPACK's SVD runs
 			# faster on tall matrices. The loadings we want — the right singular
