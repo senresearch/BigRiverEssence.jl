@@ -9,6 +9,7 @@ end
 makedocs(; modules=[BigRiverEssence], sitename="BigRiverEssence.jl", pages=[
         "Home" => "index.md",
         "Principal Component Analysis (PCA)" => "pca_tutorial.md",
+        "Nonnegative Matrix Factorization (NMF)" => "nmf_tutorial.md",
         "Penalized Matrix Decomposition (PMD)" => "pmd_tutorial.md",
         "Sparse Principal Component Analysis (SPC)" => "spc_tutorial.md",
         "Partial Least Squares kernel Regression (PLSkern)" => "plskern_tutorial.md",
