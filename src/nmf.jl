@@ -165,10 +165,10 @@ function _nmf_nndsvd_init(X::Matrix{Float64}, k::Int, variant::Symbol,
 	first_scale = sqrt(F.S[1])
 	@inbounds @simd for i in 1:n
 		w[i, 1] = first_scale * abs(F.U[i, 1])
-	end
+	end # COV_EXCL_LINE
 	@inbounds @simd for j in 1:p
 		ht[j, 1] = first_scale * abs(F.V[j, 1])
-	end
+	end # COV_EXCL_LINE
 
 	for component in 2:k
 		upos2 = 0.0;
@@ -178,11 +178,11 @@ function _nmf_nndsvd_init(X::Matrix{Float64}, k::Int, variant::Symbol,
 		@inbounds @simd for i in 1:n
 			value = F.U[i, component]
 			value >= 0 ? (upos2 += value * value) : (uneg2 += value * value)
-		end
+		end # COV_EXCL_LINE
 		@inbounds @simd for j in 1:p
 			value = F.V[j, component]
 			value >= 0 ? (vpos2 += value * value) : (vneg2 += value * value)
-		end
+		end # COV_EXCL_LINE
 
 		upos = sqrt(upos2);
 		uneg = sqrt(uneg2)
@@ -200,28 +200,28 @@ function _nmf_nndsvd_init(X::Matrix{Float64}, k::Int, variant::Symbol,
 		@inbounds @simd for i in 1:n
 			value = use_positive ? max(F.U[i, component], 0.0) : max(-F.U[i, component], 0.0)
 			w[i, component] = factor_scale * value / unorm
-		end
+		end # COV_EXCL_LINE
 		@inbounds @simd for j in 1:p
 			value = use_positive ? max(F.V[j, component], 0.0) : max(-F.V[j, component], 0.0)
 			ht[j, component] = factor_scale * value / vnorm
-		end
+		end # COV_EXCL_LINE
 	end
 
 	@inbounds @simd for i in eachindex(w)
 		w[i] < eps && (w[i] = 0.0)
-	end
+	end # COV_EXCL_LINE
 	@inbounds @simd for i in eachindex(ht)
 		ht[i] < eps && (ht[i] = 0.0)
-	end
+	end # COV_EXCL_LINE
 
 	if variant === :nndsvda
 		average = mean(X)
 		@inbounds @simd for i in eachindex(w)
 			iszero(w[i]) && (w[i] = average)
-		end
+		end # COV_EXCL_LINE
 		@inbounds @simd for i in eachindex(ht)
 			iszero(ht[i]) && (ht[i] = average)
-		end
+		end # COV_EXCL_LINE
 	elseif variant === :nndsvdar
 		average = mean(X) / 100
 		@inbounds for i in eachindex(w)
@@ -324,7 +324,7 @@ function _nmf_cd_sweep!(A, F, G, gram, cross, gradient, order,
 			projected_grad = iszero(current) ? min(0.0, grad) : grad
 			violation += abs(projected_grad)
 			iszero(hessian) || (F[observation, component] = max(current - grad / hessian, 0.0))
-		end
+		end # COV_EXCL_LINE
 	end
 	return violation
 end
@@ -406,7 +406,7 @@ function _nmf_reconstruction_error(X, w, h)
 		reconstructed = 0.0
 		@simd for component in 1:k
 			reconstructed += w[observation, component] * h[component, feature]
-		end
+		end # COV_EXCL_LINE
 		residual = X[observation, feature] - reconstructed
 		error_squared += residual * residual
 	end
