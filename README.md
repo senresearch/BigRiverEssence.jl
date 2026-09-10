@@ -31,6 +31,7 @@ reduction, and integrative analysis of complex datasets.
 The package currently implements the following methods:
 
 * Principal Component Analysis (PCA)[^1]
+* Nonnegative Matrix Factorization (NMF)[^10][^11]
 * Sparse Principal Component Analysis (SPCA)[^2]
 * Penalized Matrix Decomposition (PMD)[^2]
 * Canonical Correlation Analysis (CCA)[^3]
@@ -91,3 +92,6 @@ If you have questions about contributing or using `BigRiverEssence` package, ple
 
 [^9]: Dayal, B. S., & MacGregor, J. F. (1997). *Improved PLS Algorithms*. Journal of Chemometrics, 11(1), 73–85.
 
+[^10]: Cichocki, A., & Phan, A.-H. (2009). *Fast Local Algorithms for Large Scale Nonnegative Matrix and Tensor Factorizations*. IEICE Transactions on Fundamentals of Electronics, Communications and Computer Sciences, E92-A(3), 708–721.
+
+[^11]: Boutsidis, C., & Gallopoulos, E. (2008). *SVD Based Initialization: A Head Start for Nonnegative Matrix Factorization*. Pattern Recognition, 41(4), 1350–1362.
