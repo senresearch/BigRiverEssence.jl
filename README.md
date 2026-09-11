@@ -31,15 +31,15 @@ reduction, and integrative analysis of complex datasets.
 The package currently implements the following methods:
 
 * Principal Component Analysis (PCA)[^1]
-* Nonnegative Matrix Factorization (NMF)[^10][^11]
 * Sparse Principal Component Analysis (SPCA)[^2]
 * Penalized Matrix Decomposition (PMD)[^2]
-* Canonical Correlation Analysis (CCA)[^3]
-* Sparse Canonical Correlation Analysis (SCCA)[^4]
-* Joint and Individual Variation Explained (JIVE)[^5]
-* Partial Least Squares Discriminant Analysis (PLSDA)[^6]
-* Sparse Partial Least Squares Discriminant Analysis (SPLSDA)[^7][^8]
-* Partial Least Squares Kernel Regression (PLSkern)[^9]
+* Nonnegative Matrix Factorization (NMF)[^3][^4]
+* Canonical Correlation Analysis (CCA)[^5]
+* Sparse Canonical Correlation Analysis (SCCA)[^6]
+* Joint and Individual Variation Explained (JIVE)[^7]
+* Partial Least Squares Kernel Regression (PLSkern)[^8]
+* Partial Least Squares Discriminant Analysis (PLSDA)[^9]
+* Sparse Partial Least Squares Discriminant Analysis (SPLSDA)[^10][^11]
 
 ## Installation 
 
@@ -64,8 +64,9 @@ Pkg.add(url = "https://github.com/senresearch/BigRiverEssence.jl", rev="main")
 
 ## Contributing
 
-We welcome contributions that improve documentation, performance, testing, and functionality. 
-Users can contribute by opening an issue or submitting a pull request.
+We appreciate contributions from users. GitHub Issues are the preferred venue for 
+reporting bugs and requesting features, while GitHub Pull Requests are the preferred 
+venue for contributing code, such as bug fixes, performance improvements, or new features.
 
 ## Questions
 
@@ -78,20 +79,21 @@ If you have questions about contributing or using `BigRiverEssence` package, ple
 
 [^2]: Witten, D. M., Tibshirani, R., & Hastie, T. (2009). *A Penalized Matrix Decomposition, with Applications to Sparse Principal Components and Canonical Correlation Analysis*. Biostatistics, 10(3), 515–534.
 
-[^3]: Weenink, D. (2003). *Canonical Correlation Analysis*. Institute of Phonetic Sciences, University of Amsterdam, Proceedings 25, 81–99.
+[^3]: Cichocki, A., & Phan, A.-H. (2009). *Fast Local Algorithms for Large Scale Nonnegative Matrix and Tensor Factorizations*. IEICE Transactions on Fundamentals of Electronics, Communications and Computer Sciences, E92-A(3), 708–721.
 
-[^4]: Witten, D. M., & Tibshirani, R. (2009). *Extensions of Sparse Canonical Correlation Analysis with Applications to Genomic Data*. Statistical Applications in Genetics and Molecular Biology, 8(1), Article 28.
+[^4]: Boutsidis, C., & Gallopoulos, E. (2008). *SVD Based Initialization: A Head Start for Nonnegative Matrix Factorization*. Pattern Recognition, 41(4), 1350–1362.
 
-[^5]: Lock, E. F., Hoadley, K. A., Marron, J. S., & Nobel, A. B. (2013). *Joint and Individual Variation Explained (JIVE) for Integrated Analysis of Multiple Data Types*. Annals of Applied Statistics, 7(1), 523–542.
+[^5]: Weenink, D. (2003). *Canonical Correlation Analysis*. Institute of Phonetic Sciences, University of Amsterdam, Proceedings 25, 81–99.
 
-[^6]: Pérez-Enciso, M., Tenenhaus, M. Prediction of clinical outcome with microarray data: a partial least squares discriminant analysis (PLS-DA) approach. Hum Genet 112, 581–592 (2003). https://doi.org/10.1007/s00439-003-0921-9
+[^6]: Witten, D. M., & Tibshirani, R. (2009). *Extensions of Sparse Canonical Correlation Analysis with Applications to Genomic Data*. Statistical Applications in Genetics and Molecular Biology, 8(1), Article 28.
 
-[^7]: Lê Cao, K.-A., Boitard, S., & Besse, P. (2011). *Sparse PLS Discriminant Analysis: Biologically Relevant Feature Selection and Graphical Displays for Multiclass Problems*. BMC Bioinformatics, 12, 253. 
+[^7]: Lock, E. F., Hoadley, K. A., Marron, J. S., & Nobel, A. B. (2013). *Joint and Individual Variation Explained (JIVE) for Integrated Analysis of Multiple Data Types*. Annals of Applied Statistics, 7(1), 523–542.
 
-[^8]: Lê Cao, K.-A., Rossouw, D., Robert-Granié, C., & Besse, P. (2008). *A Sparse PLS for Variable Selection when Integrating Omics Data*. Statistical Applications in Genetics and Molecular Biology, 7(1), Article 35. 
+[^8]: Dayal, B. S., & MacGregor, J. F. (1997). *Improved PLS Algorithms*. Journal of Chemometrics, 11(1), 73–85.
 
-[^9]: Dayal, B. S., & MacGregor, J. F. (1997). *Improved PLS Algorithms*. Journal of Chemometrics, 11(1), 73–85.
+[^9]: Pérez-Enciso, M., Tenenhaus, M. Prediction of clinical outcome with microarray data: a partial least squares discriminant analysis (PLS-DA) approach. Hum Genet 112, 581–592 (2003). https://doi.org/10.1007/s00439-003-0921-9
 
-[^10]: Cichocki, A., & Phan, A.-H. (2009). *Fast Local Algorithms for Large Scale Nonnegative Matrix and Tensor Factorizations*. IEICE Transactions on Fundamentals of Electronics, Communications and Computer Sciences, E92-A(3), 708–721.
+[^10]: Lê Cao, K.-A., Boitard, S., & Besse, P. (2011). *Sparse PLS Discriminant Analysis: Biologically Relevant Feature Selection and Graphical Displays for Multiclass Problems*. BMC Bioinformatics, 12, 253. 
 
-[^11]: Boutsidis, C., & Gallopoulos, E. (2008). *SVD Based Initialization: A Head Start for Nonnegative Matrix Factorization*. Pattern Recognition, 41(4), 1350–1362.
+[^11]: Lê Cao, K.-A., Rossouw, D., Robert-Granié, C., & Besse, P. (2008). *A Sparse PLS for Variable Selection when Integrating Omics Data*. Statistical Applications in Genetics and Molecular Biology, 7(1), Article 35. 
+
